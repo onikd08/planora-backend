@@ -1,0 +1,80 @@
+model Event {
+    id String @id @default(uuid())
+
+    title       String
+    description String
+    imageURL    String?
+
+    isDeleted Boolean @default(false)
+
+    startTime DateTime
+    endTime   DateTime
+
+    startDate DateTime @db.Date
+    endDate   DateTime @db.Date
+
+    country    String
+    city       String
+    address    String
+    postalCode String
+
+    fee      Float @default(0)
+    capacity Int
+
+    categoryId String
+    category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+    creatorId String
+    creator   User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+    reviews Review[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    eventParticipations EventParticipation[]
+
+    @@index([title], name: "idx_event_title")
+    @@index([startDate, endDate], name: "idx_event_date")
+    @@index([country, city], name: "idx_event_location")
+    @@index([categoryId], name: "idx_event_category")
+    @@index([creatorId], name: "idx_event_creator")
+    @@map("events")
+}
+
+model EventCategory {
+    id     String  @id @default(uuid())
+    name   String  @unique
+    events Event[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@index([name], name: "idx_category_name")
+    @@map("event_categories")
+}
+
+model EventParticipation {
+    id String @id @default(uuid())
+
+    userId  String
+    eventId String
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    status        ParticipationStatus @default(PENDING)
+    paymentStatus PaymentStatus       @default(PENDING)
+
+    joinedAt DateTime @default(now())
+
+    user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+    event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+    payment Payment?
+
+    @@unique([userId, eventId])
+    @@index([userId], name: "idx_participation_user")
+    @@index([eventId], name: "idx_participation_event")
+    @@map("event_participations")
+}

@@ -1,20 +1,24 @@
 model User {
-    id        String   @id @default(uuid())
-    firstName      String
-    lastName      String
-    email     String   @unique
-    password  String
-    role      UserRole @default(USER)
-    status    UserStatus @default(ACTIVE)
+  id        String     @id @default(uuid())
+  firstName String
+  lastName  String
+  email     String     @unique
+  password  String
+  role      UserRole   @default(USER)
+  status    UserStatus @default(ACTIVE)
 
-    profilePhoto String?
-    phone String?
-    gender GENDER?
+  profilePhoto String?
+  phone        String?
+  gender       GENDER?
 
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-    @@index([firstName, lastName], name: "idx_user_name")
-    @@index([email], name: "idx_user_email")
-    @@map("users")
+  events              Event[]
+  eventParticipations EventParticipation[]
+  reviews             Review[]
+
+  @@index([firstName, lastName], name: "idx_user_name")
+  @@index([email], name: "idx_user_email")
+  @@map("users")
 }

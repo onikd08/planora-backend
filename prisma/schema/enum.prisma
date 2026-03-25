@@ -1,15 +1,35 @@
 enum UserRole {
-    USER
-    ADMIN
+  USER
+  ADMIN
 }
 
 enum UserStatus {
-    ACTIVE
-    BANNED
+  ACTIVE
+  BANNED
 }
 
 enum GENDER {
-    MALE
-    FEMALE
-    OTHER
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipationStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
 }
