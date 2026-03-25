@@ -5,7 +5,8 @@ model Event {
     description String
     imageURL    String?
 
-    isDeleted Boolean @default(false)
+    isDeleted   Boolean     @default(false)
+    eventStatus EventStatus @default(UPCOMING)
 
     startTime DateTime
     endTime   DateTime
@@ -63,8 +64,8 @@ model EventParticipation {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    status        ParticipationStatus @default(PENDING)
-    paymentStatus PaymentStatus       @default(PENDING)
+    participationStatus ParticipationStatus @default(PENDING)
+    paymentStatus       PaymentStatus       @default(PENDING)
 
     joinedAt DateTime @default(now())
 

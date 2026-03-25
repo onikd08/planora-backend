@@ -16,7 +16,7 @@ const createReview = async (userId: string, payload: ICreateReview) => {
     }
 
     // Check if event is completed
-    if (event.status !== EventStatus.COMPLETED) {
+    if (event.eventStatus !== EventStatus.COMPLETED) {
         throw new AppError(status.BAD_REQUEST, "Review can only be given after the event is completed");
     }
 
@@ -30,7 +30,7 @@ const createReview = async (userId: string, payload: ICreateReview) => {
         }
     });
 
-    if (!participation || participation.status !== ParticipationStatus.CONFIRMED) {
+    if (!participation || participation.participationStatus !== ParticipationStatus.CONFIRMED) {
         throw new AppError(status.FORBIDDEN, "You can only review events you have fully participated in");
     }
 
