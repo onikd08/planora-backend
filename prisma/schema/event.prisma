@@ -65,7 +65,6 @@ model EventParticipation {
     updatedAt DateTime @updatedAt
 
     participationStatus ParticipationStatus @default(PENDING)
-    paymentStatus       PaymentStatus       @default(PENDING)
 
     joinedAt DateTime @default(now())
 

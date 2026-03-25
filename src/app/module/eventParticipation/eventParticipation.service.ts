@@ -36,13 +36,6 @@ const joinEvent = async (userId: string, eventId: string) => {
             }
         });
 
-        await tx.event.update({
-            where: { id: eventId },
-            data: {
-                capacity: event.capacity - 1
-            }
-        });
-
         return participation;
     });
 

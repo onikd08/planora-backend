@@ -15,6 +15,7 @@ interface IEnvConfig {
   ACCESS_TOKEN_EXPIRES_IN: string;
   REFRESH_TOKEN_SECRET: string;
   REFRESH_TOKEN_EXPIRES_IN: string;
+  STRIPE_SECRET_KEY: string;
 }
 
 const loadEnvVariables = (): IEnvConfig => {
@@ -29,6 +30,7 @@ const loadEnvVariables = (): IEnvConfig => {
     "ACCESS_TOKEN_EXPIRES_IN",
     "REFRESH_TOKEN_SECRET",
     "REFRESH_TOKEN_EXPIRES_IN",
+    "STRIPE_SECRET_KEY",
   ];
 
   requiredEnvVariables.forEach((envVariable) => {
@@ -51,6 +53,7 @@ const loadEnvVariables = (): IEnvConfig => {
     ACCESS_TOKEN_EXPIRES_IN: process.env.ACCESS_TOKEN_EXPIRES_IN as string,
     REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET as string,
     REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN as string,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY as string,
   };
 };
 
