@@ -9,6 +9,12 @@ interface IEnvConfig {
   PORT: string;
   DATABASE_URL: string;
   FRONTEND_URL: string;
+  ADMIN_EMAIL: string;
+  ADMIN_PASSWORD: string;
+  ACCESS_TOKEN_SECRET: string;
+  ACCESS_TOKEN_EXPIRES_IN: string;
+  REFRESH_TOKEN_SECRET: string;
+  REFRESH_TOKEN_EXPIRES_IN: string;
 }
 
 const loadEnvVariables = (): IEnvConfig => {
@@ -17,6 +23,12 @@ const loadEnvVariables = (): IEnvConfig => {
     "PORT",
     "DATABASE_URL",
     "FRONTEND_URL",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD",
+    "ACCESS_TOKEN_SECRET",
+    "ACCESS_TOKEN_EXPIRES_IN",
+    "REFRESH_TOKEN_SECRET",
+    "REFRESH_TOKEN_EXPIRES_IN",
   ];
 
   requiredEnvVariables.forEach((envVariable) => {
@@ -33,6 +45,12 @@ const loadEnvVariables = (): IEnvConfig => {
     PORT: process.env.PORT as string,
     DATABASE_URL: process.env.DATABASE_URL as string,
     FRONTEND_URL: process.env.FRONTEND_URL as string,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL as string,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD as string,
+    ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET as string,
+    ACCESS_TOKEN_EXPIRES_IN: process.env.ACCESS_TOKEN_EXPIRES_IN as string,
+    REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET as string,
+    REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN as string,
   };
 };
 

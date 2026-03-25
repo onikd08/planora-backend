@@ -1,15 +1,20 @@
 model User {
     id        String   @id @default(uuid())
-    name      String
+    firstName      String
+    lastName      String
     email     String   @unique
     password  String
     role      UserRole @default(USER)
+    status    UserStatus @default(ACTIVE)
+
+    profilePhoto String?
+    phone String?
+    gender String?
+
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
 
-    imageURL String?
-
-    @@index([name], name: "idx_user_name")
+    @@index([firstName, lastName], name: "idx_user_name")
     @@index([email], name: "idx_user_email")
     @@map("users")
 }

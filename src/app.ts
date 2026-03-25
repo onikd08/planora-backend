@@ -4,6 +4,7 @@ import cookieParser from "cookie-parser";
 import envVars from "./config/env";
 import { notFound } from "./app/middleware/notFound";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
+import { IndexRoutes } from "./app/routes";
 
 const app: Application = express();
 
@@ -24,6 +25,9 @@ app.use(
 );
 
 // application routes
+
+app.use("/api/v1", IndexRoutes);
+
 
 app.get("/", async (req: Request, res: Response) => {
   res.send("Hello from Planora-Backend");
