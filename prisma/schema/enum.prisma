@@ -7,3 +7,9 @@ enum UserStatus {
     ACTIVE
     BANNED
 }
+
+enum GENDER {
+    MALE
+    FEMALE
+    OTHER
+}
