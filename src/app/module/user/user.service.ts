@@ -108,10 +108,27 @@ const updateStatus = async (id: string) => {
    return safeUser;
 }
 
+const getMyProfile = async(id: string)=>{
+    const user = await prisma.user.findUnique({
+        where: {
+            id
+        }
+    })
+
+    if (!user) {
+        throw new AppError(status.NOT_FOUND, "User not found");
+    }
+
+    const {password: userPassword, ...safeUser} = user;
+
+    return safeUser;
+}
+
 export const UserService = {
     createAdmin,
     getAllUsers,
     getUserById,
     updateProfile,
-    updateStatus
+    updateStatus,
+    getMyProfile
 }

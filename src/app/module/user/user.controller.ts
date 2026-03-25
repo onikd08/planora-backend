@@ -58,10 +58,24 @@ const updateProfile = catchAsync(async (req, res) => {
     });
 });
 
+const getMyProfile = catchAsync(async (req, res) => {
+    if(!req.user){
+        throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+    }
+    const result = await UserService.getMyProfile(req.user.id as string);
+    sendResponse(res, {
+        statusCode: status.OK,
+        success: true,
+        message: "Profile fetched successfully",
+        data: result,
+    });
+});
+
 export const UserController = {
     createAdmin,
     updateStatus,
     getAllUsers,
     getUserById,
-    updateProfile
+    updateProfile,
+    getMyProfile
 }
