@@ -2,6 +2,8 @@ import express, { Application, Request, Response } from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import envVars from "./config/env";
+import { notFound } from "./app/middleware/notFound";
+import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 
 const app: Application = express();
 
@@ -26,5 +28,11 @@ app.use(
 app.get("/", async (req: Request, res: Response) => {
   res.send("Hello from Planora-Backend");
 });
+
+// not-found
+app.use(notFound);
+
+// global error handler
+app.use(globalErrorHandler);
 
 export default app;
