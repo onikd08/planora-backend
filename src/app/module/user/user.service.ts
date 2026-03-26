@@ -120,6 +120,10 @@ const getMyProfile = async(id: string)=>{
     const user = await prisma.user.findUnique({
         where: {
             id
+        },
+        include: {
+            eventParticipations:true,
+            events: true
         }
     })
 
