@@ -4,13 +4,21 @@ import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 
 const createEvent = async (creatorId: string, payload: ICreateEvent) => {
+    const {startTime, endTime, ...rest} = payload;
+
+    // check start time < end time
+    const startTimeDate = new Date(startTime);
+    const endTimeDate = new Date(endTime);
+
+    if (startTimeDate >= endTimeDate) {
+        throw new AppError(status.BAD_REQUEST, "Start time must be before end time");
+    }
+    
     const event = await prisma.event.create({
         data: {
-            ...payload,
-            startTime: new Date(payload.startTime),
-            endTime: new Date(payload.endTime),
-            startDate: new Date(payload.startDate),
-            endDate: new Date(payload.endDate),
+            ...rest,
+            startTime: startTimeDate,
+            endTime: endTimeDate,
             creatorId,
         },
     });

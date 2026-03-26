@@ -4,8 +4,6 @@ export interface ICreateEvent {
     imageURL?: string;
     startTime: string;
     endTime: string;
-    startDate: string;
-    endDate: string;
     country: string;
     city: string;
     address: string;
