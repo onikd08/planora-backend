@@ -36,7 +36,11 @@ const createAdmin = async (payload: ICreateAdmin) => {
 }
 
 const getAllUsers = async () => {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+        where: {
+            status: UserStatus.ACTIVE,
+        }
+    });
 
     return users.map(user => {
         const {password: userPassword, ...safeUser} = user;
@@ -53,6 +57,10 @@ const getUserById = async (id: string) => {
 
     if(!user){
         throw new AppError(status.NOT_FOUND, "User not found");
+    }
+
+    if (user.status !== UserStatus.ACTIVE) {
+        throw new AppError(status.FORBIDDEN, "User is not active");
     }
 
     const {password: userPassword, ...safeUser} = user;
