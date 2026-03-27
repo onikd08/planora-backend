@@ -4,99 +4,137 @@ import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 
 const createEvent = async (creatorId: string, payload: ICreateEvent) => {
-    const {startTime, endTime, ...rest} = payload;
+  const { startTime, endTime, ...rest } = payload;
 
-    // check start time < end time
-    const startTimeDate = new Date(startTime);
-    const endTimeDate = new Date(endTime);
+  // check start time < end time
+  const startTimeDate = new Date(startTime);
+  const endTimeDate = new Date(endTime);
 
-    if (startTimeDate >= endTimeDate) {
-        throw new AppError(status.BAD_REQUEST, "Start time must be before end time");
-    }
-    
-    const event = await prisma.event.create({
-        data: {
-            ...rest,
-            startTime: startTimeDate,
-            endTime: endTimeDate,
-            creatorId,
+  if (startTimeDate >= endTimeDate) {
+    throw new AppError(
+      status.BAD_REQUEST,
+      "Start time must be before end time",
+    );
+  }
+
+  const event = await prisma.event.create({
+    data: {
+      ...rest,
+      startTime: startTimeDate,
+      endTime: endTimeDate,
+      creatorId,
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true,
         },
-    });
-    return event;
-}
+      },
+    },
+  });
+  return event;
+};
 
 const getAllEvents = async () => {
-    const events = await prisma.event.findMany({
-        where: {
-            isDeleted: false
+  const events = await prisma.event.findMany({
+    where: {
+      isDeleted: false,
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true,
         },
-        include: {
-            category: true,
-            creator: {
-                select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    profilePhoto: true
-                }
-            }
-        }
-    });
-    return events;
-}
+      },
+    },
+  });
+  return events;
+};
 
 const getEventById = async (id: string) => {
-    const event = await prisma.event.findUnique({
-        where: {
-            id,
-            isDeleted: false
+  const event = await prisma.event.findUnique({
+    where: {
+      id,
+      isDeleted: false,
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true,
         },
-        include: {
-            category: true,
-            creator: {
-                select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    profilePhoto: true
-                }
-            }
-        }
-    });
+      },
+    },
+  });
 
-    if (!event) {
-        throw new AppError(status.NOT_FOUND, "Event not found");
-    }
-    return event;
-}
+  if (!event) {
+    throw new AppError(status.NOT_FOUND, "Event not found");
+  }
+  return event;
+};
 
 const getMyCreatedEvents = async (creatorId: string) => {
-    const events = await prisma.event.findMany({
-        where: {
-            creatorId,
-            isDeleted: false
+  const events = await prisma.event.findMany({
+    where: {
+      creatorId,
+      isDeleted: false,
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true,
         },
-        include: {
-            category: true,
-            creator: {
-                select: {
-                    id: true,
-                    firstName: true,
-                    lastName: true,
-                    email: true,
-                    profilePhoto: true
-                }
-            }
-        }
-    });
-    return events;
-}
+      },
+    },
+  });
+  return events;
+};
+
+const makeEventFeatured = async (id: string) => {
+  const event = await prisma.event.findUnique({
+    where: {
+      id,
+      isDeleted: false,
+    },
+  });
+
+  if (!event) {
+    throw new AppError(status.NOT_FOUND, "Event not found");
+  }
+
+  const result = await prisma.event.update({
+    where: {
+      id,
+    },
+    data: {
+      isFeatured: !event.isFeatured,
+    },
+  });
+  return result;
+};
 
 export const EventService = {
-    createEvent,
-    getAllEvents,
-    getEventById,
-    getMyCreatedEvents
-}
+  createEvent,
+  getAllEvents,
+  getEventById,
+  getMyCreatedEvents,
+  makeEventFeatured,
+};

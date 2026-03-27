@@ -5,6 +5,7 @@ model Event {
     description String
     imageURL    String?
 
+    isFeatured  Boolean     @default(false)
     isDeleted   Boolean     @default(false)
     eventStatus EventStatus @default(UPCOMING)
 

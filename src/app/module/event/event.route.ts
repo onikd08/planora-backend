@@ -7,9 +7,23 @@ import { EventValidation } from "./event.validation";
 
 const router = Router();
 
-router.post("/", auth(UserRole.ADMIN, UserRole.USER), validateRequest(EventValidation.createEventValidation), EventController.createEvent);
+router.post(
+  "/",
+  auth(UserRole.ADMIN, UserRole.USER),
+  validateRequest(EventValidation.createEventValidation),
+  EventController.createEvent,
+);
 router.get("/", EventController.getAllEvents);
+router.get(
+  "/my-created-events",
+  auth(UserRole.ADMIN, UserRole.USER),
+  EventController.getMyCreatedEvents,
+);
 router.get("/:id", EventController.getEventById);
-router.get("/my-created-events", auth(UserRole.ADMIN, UserRole.USER), EventController.getMyCreatedEvents);
+router.put(
+  "/:id/feature",
+  auth(UserRole.ADMIN),
+  EventController.makeEventFeatured,
+);
 
 export const EventRoutes = router;
