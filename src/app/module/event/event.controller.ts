@@ -22,7 +22,7 @@ const createEvent = catchAsync(async (req, res) => {
 });
 
 const getAllEvents = catchAsync(async (req, res) => {
-  const result = await EventService.getAllEvents();
+  const result = await EventService.getAllEvents(req.query);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
@@ -45,7 +45,6 @@ const getMyCreatedEvents = catchAsync(async (req, res) => {
   if (!req.user) {
     throw new AppError(status.UNAUTHORIZED, "Unauthorized");
   }
-  console.log(req.user);
   const result = await EventService.getMyCreatedEvents(req.user.id as string);
   sendResponse(res, {
     statusCode: status.OK,
