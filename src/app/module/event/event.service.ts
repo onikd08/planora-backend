@@ -3,7 +3,7 @@ import { ICreateEvent } from "./event.interface";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 import { Prisma } from "../../../generated/prisma/client";
-import { EventSearchableFields } from "./event.constants";
+import { EventSearchableFields, EVENT_STATUS } from "./event.constants";
 
 const createEvent = async (creatorId: string, payload: ICreateEvent) => {
   const { startTime, endTime, ...rest } = payload;
@@ -127,6 +127,21 @@ const getAllEvents = async (query: Record<string, unknown>) => {
       } else if (key === "type") {
         if (value === "paid") feeFilter.gt = 0;
         else if (value === "free") feeFilter.equals = 0;
+      } else if (key === "eventStatus") {
+        const now = new Date();
+        if (value === EVENT_STATUS.UPCOMING) {
+          formattedFilterData["startTime"] = { gt: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.ONGOING) {
+          formattedFilterData["startTime"] = { lte: now };
+          formattedFilterData["endTime"] = { gte: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.COMPLETED) {
+          formattedFilterData["endTime"] = { lt: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.CANCELLED) {
+          formattedFilterData["isCancelled"] = true;
+        }
       } else if (["isFeatured", "isDeleted"].includes(key)) {
         formattedFilterData[key] = value === "true";
       } else if (["startTime", "endTime"].includes(key)) {

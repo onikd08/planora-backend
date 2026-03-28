@@ -14,12 +14,6 @@ enum GENDER {
   OTHER
 }
 
-enum EventStatus {
-  UPCOMING
-  ONGOING
-  COMPLETED
-  CANCELLED
-}
 
 enum ParticipationStatus {
   PENDING
