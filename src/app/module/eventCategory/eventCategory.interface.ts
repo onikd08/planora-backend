@@ -1,3 +1,4 @@
 export interface ICreateEventCategory {
-    name: string;
+  name: string;
+  icon: string;
 }
