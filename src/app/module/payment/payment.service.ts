@@ -2,7 +2,8 @@ import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
 import { IConfirmPayment, ICreatePaymentIntent } from "./payment.interface";
-import { EventStatus, ParticipationStatus, PaymentStatus } from "../../../generated/prisma/enums";
+import { EVENT_STATUS } from "../event/event.constants";
+import { ParticipationStatus, PaymentStatus } from "../../../generated/prisma/enums";
 import { stripe } from "../../lib/stripe";
 
 /**
@@ -25,7 +26,7 @@ const createPaymentIntent = async (payload: ICreatePaymentIntent) => {
         throw new AppError(status.BAD_REQUEST, "Event is full");
     }
 
-    if (participation.event.eventStatus !== EventStatus.UPCOMING) {
+    if (participation.event.eventStatus !== EVENT_STATUS.UPCOMING) {
         throw new AppError(status.BAD_REQUEST, "You can only pay for upcoming events");
     }
 
