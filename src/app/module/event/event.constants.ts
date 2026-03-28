@@ -5,5 +5,4 @@ export const EventSearchableFields = [
   "city",
   "address",
   "postalCode",
-  "eventStatus",
 ];

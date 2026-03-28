@@ -113,9 +113,20 @@ const getAllEvents = async (query: Record<string, unknown>) => {
 
   if (Object.keys(filterData).length > 0) {
     const formattedFilterData: Record<string, unknown> = {};
+    const feeFilter: Prisma.FloatFilter = {};
+
     for (const [key, value] of Object.entries(filterData)) {
-      if (["fee", "capacity"].includes(key)) {
+      if (key === "capacity") {
         formattedFilterData[key] = Number(value);
+      } else if (key === "fee") {
+        feeFilter.equals = Number(value);
+      } else if (key === "minFee") {
+        feeFilter.gte = Number(value);
+      } else if (key === "maxFee") {
+        feeFilter.lte = Number(value);
+      } else if (key === "type") {
+        if (value === "paid") feeFilter.gt = 0;
+        else if (value === "free") feeFilter.equals = 0;
       } else if (["isFeatured", "isDeleted"].includes(key)) {
         formattedFilterData[key] = value === "true";
       } else if (["startTime", "endTime"].includes(key)) {
@@ -162,6 +173,11 @@ const getAllEvents = async (query: Record<string, unknown>) => {
         formattedFilterData[key] = value;
       }
     }
+
+    if (Object.keys(feeFilter).length > 0) {
+      formattedFilterData["fee"] = feeFilter;
+    }
+
     whereConditions.push(formattedFilterData as Prisma.EventWhereInput);
   }
 
@@ -217,6 +233,19 @@ const getEventById = async (id: string) => {
           lastName: true,
           email: true,
           profilePhoto: true,
+        },
+      },
+      reviews: true,
+      eventParticipations: {
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              profilePhoto: true,
+            },
+          },
         },
       },
     },
