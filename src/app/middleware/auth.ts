@@ -5,11 +5,10 @@ import catchAsync from "../shared/catchAsync";
 import jwtUtils from "../utils/jwt";
 import envVars from "../../config/env";
 import { JwtPayload } from "jsonwebtoken";
-import cookieUtils from "../utils/cookie";
 
 const auth = (...requiredRoles: string[]) => {
   return catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-    const token = cookieUtils.getCookie(req, "accessToken");
+    const token = req.headers.authorization;
 
     // check if the token is missing
     if (!token) {
@@ -19,7 +18,7 @@ const auth = (...requiredRoles: string[]) => {
     // verify token
     const verifiedUser = jwtUtils.verifyToken(
       token,
-      envVars.ACCESS_TOKEN_SECRET
+      envVars.ACCESS_TOKEN_SECRET,
     );
 
     if (!verifiedUser.success || !verifiedUser.data) {

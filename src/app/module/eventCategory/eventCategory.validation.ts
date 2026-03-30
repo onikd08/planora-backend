@@ -7,6 +7,14 @@ const createEventCategoryValidation = z.object({
   }),
 });
 
+const updateEventCategoryValidation = z.object({
+  body: z.object({
+    name: z.string().min(1, "Name is required"),
+    icon: z.string().min(1, "Icon is required"),
+  }),
+});
+
 export const EventCategoryValidation = {
   createEventCategoryValidation,
+  updateEventCategoryValidation,
 };
