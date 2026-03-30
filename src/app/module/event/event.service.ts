@@ -217,6 +217,7 @@ const getAllEvents = async (query: Record<string, unknown>) => {
             profilePhoto: true,
           },
         },
+        eventParticipations: true,
       },
     }),
     prisma.event.count({ where: whereClause }),

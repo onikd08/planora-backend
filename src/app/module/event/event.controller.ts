@@ -59,7 +59,7 @@ const makeEventFeatured = catchAsync(async (req, res) => {
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
-    message: "Event featured successfully",
+    message: "Event featured changed successfully",
     data: result,
   });
 });
