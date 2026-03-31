@@ -7,7 +7,16 @@ import { EventParticipationValidation } from "./eventParticipation.validation";
 
 const router = Router();
 
-router.post("/join", auth(UserRole.USER, UserRole.ADMIN), validateRequest(EventParticipationValidation.createParticipationValidation), EventParticipationController.joinEvent);
-router.get("/my-events", auth(UserRole.USER, UserRole.ADMIN), EventParticipationController.getMyParticipations);
+router.post(
+  "/join",
+  auth(UserRole.USER, UserRole.ADMIN),
+  validateRequest(EventParticipationValidation.createParticipationValidation),
+  EventParticipationController.joinEvent,
+);
+router.get(
+  "/my-participations",
+  auth(UserRole.USER, UserRole.ADMIN),
+  EventParticipationController.getMyParticipations,
+);
 
 export const EventParticipationRoutes = router;

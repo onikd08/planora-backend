@@ -281,6 +281,11 @@ const getMyCreatedEvents = async (creatorId: string) => {
     },
     include: {
       category: true,
+      eventParticipations: {
+        where: {
+          participationStatus: "CONFIRMED",
+        },
+      },
       creator: {
         select: {
           id: true,
