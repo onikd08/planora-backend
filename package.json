@@ -14,7 +14,9 @@
     "studio": "prisma studio",
     "push": "prisma db push",
     "pull": "prisma db pull",
-    "seed-admin": "tsx src/app/seed/seedAdmin.ts"
+    "seed-admin": "tsx src/app/seed/seedAdmin.ts",
+    "stripe:webhook": "stripe listen --forward-to localhost:4000/webhook",
+    "stripe:trigger": "stripe trigger payment_intent.succeeded"
   },
   "keywords": [],
   "author": "",

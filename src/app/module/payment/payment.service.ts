@@ -1,178 +1,101 @@
 import { prisma } from "../../lib/prisma";
-import AppError from "../../errorHelpers/AppError";
-import status from "http-status";
-import { IConfirmPayment, ICreatePaymentIntent } from "./payment.interface";
-import { EVENT_STATUS } from "../event/event.constants";
-import { ParticipationStatus, PaymentStatus } from "../../../generated/prisma/enums";
-import { stripe } from "../../lib/stripe";
 
-/**
- * Creates a Stripe PaymentIntent.
- * Amount is taken from the event fee to prevent client-side tampering.
- */
-const createPaymentIntent = async (payload: ICreatePaymentIntent) => {
-    const { participationId } = payload;
+import {
+  ParticipationStatus,
+  PaymentStatus,
+} from "../../../generated/prisma/enums";
 
-    const participation = await prisma.eventParticipation.findUnique({
-        where: { id: participationId },
-        include: { event: true, payment: true }
-    });
+import Stripe from "stripe";
 
-    if (!participation) {
-        throw new AppError(status.NOT_FOUND, "Participation record not found");
-    }
+const handleStripeWebhookEvent = async (event: Stripe.Event) => {
+  const existingPayment = await prisma.payment.findFirst({
+    where: { stripeEventId: event.id },
+  });
 
-    if(participation.event.capacity === 0){
-        throw new AppError(status.BAD_REQUEST, "Event is full");
-    }
-
-    if (participation.event.eventStatus !== EVENT_STATUS.UPCOMING) {
-        throw new AppError(status.BAD_REQUEST, "You can only pay for upcoming events");
-    }
-
-
-
-    if (participation.payment?.paymentStatus === PaymentStatus.PAID) {
-        throw new AppError(status.BAD_REQUEST, "Payment already processed for this participation");
-    }
-
-    const eventFee = participation.event.fee;
-
-    // Free events — no payment needed, auto-confirm
-    if (eventFee === 0) {
-        await  prisma.$transaction(async(tx)=>{
-
-            await tx.eventParticipation.update({
-            where: { id: participationId },
-            data: {
-                participationStatus: ParticipationStatus.CONFIRMED
-            }
-        });
-            await tx.payment.create({
-                data: {
-                    participationId,
-                    amount: eventFee,
-                    transactionId: `FREE_${participationId}`,
-                    paymentStatus: PaymentStatus.PAID,
-                    paymentGatewayData: {}
-                }
-            });
-            await tx.event.update({
-                where: { id: participation.eventId },
-                data: {
-                    capacity: {
-                        decrement: 1
-                    }
-                }
-            });
-        })
-        return { message: "Free event — participation confirmed automatically" };
-    }
-
-    const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(eventFee * 100), // Stripe requires smallest currency unit
-        currency: "usd",
-        metadata: { participationId, eventId: participation.eventId },
-        automatic_payment_methods: {
-            enabled: true,
-            allow_redirects: "always",
-        }
-    });
-
+  if (existingPayment) {
+    console.log("Payment already processed for this participation");
     return {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        amount: eventFee,
-        currency: "usd"
+      message: "Payment already processed for this participation. Skipping...",
     };
-}
+  }
 
-/**
- * Confirms a payment by retrieving the PaymentIntent from Stripe and
- * verifying its status. Creates the Payment record and confirms participation.
- */
-const confirmPayment = async (payload: IConfirmPayment) => {
-    const { paymentIntentId, participationId } = payload;
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const participationId = session.metadata?.participationId;
+      const paymentId = session.metadata?.paymentId;
 
-    // Fetch the PaymentIntent from Stripe to verify its status
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      if (!participationId || !paymentId) {
+        console.error("Missing metadata");
+        return {
+          message: "Missing metadata",
+        };
+      }
 
-    if (paymentIntent.status !== "succeeded") {
-        throw new AppError(
-            status.BAD_REQUEST,
-            `Payment not successful. Stripe status: ${paymentIntent.status}`
-        );
-    }
-
-    // Verify metadata matches to prevent cross-participation exploits
-    if (paymentIntent.metadata.participationId !== participationId) {
-        throw new AppError(status.FORBIDDEN, "Payment intent does not match this participation");
-    }
-
-    const participation = await prisma.eventParticipation.findUnique({
+      const participation = await prisma.eventParticipation.findUnique({
         where: { id: participationId },
-        include: { payment: true }
-    });
+        include: { payment: true },
+      });
 
-    if (!participation) {
-        throw new AppError(status.NOT_FOUND, "Participation record not found");
-    }
+      if (!participation) {
+        console.error("Participation not found");
+        return {
+          message: "Participation not found",
+        };
+      }
 
-    if (participation.payment?.paymentStatus === PaymentStatus.PAID) {
-        throw new AppError(status.CONFLICT, "Payment already confirmed for this participation");
-    }
-
-    const result = await prisma.$transaction(async (tx) => {
-        const payment = await tx.payment.create({
-            data: {
-                participationId,
-                amount: paymentIntent.amount / 100,
-                transactionId: paymentIntent.id,
-                paymentStatus: PaymentStatus.PAID,
-                paymentGatewayData: paymentIntent as object
-            }
-        });
-
+      await prisma.$transaction(async (tx) => {
         await tx.eventParticipation.update({
-            where: { id: participationId },
-            data: {
-                participationStatus: ParticipationStatus.CONFIRMED
-            }
+          where: { id: participationId },
+          data: {
+            participationStatus:
+              session.payment_status === "paid"
+                ? ParticipationStatus.CONFIRMED
+                : ParticipationStatus.PENDING,
+          },
         });
 
-        await tx.event.update({
-            where: { id: participation.eventId },
-            data: {
-                capacity: {
-                    decrement: 1
-                }
-            }
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            paymentStatus:
+              session.payment_status === "paid"
+                ? PaymentStatus.PAID
+                : PaymentStatus.PENDING,
+            stripeEventId: event.id,
+            paymentGatewayData: session as object,
+          },
         });
-
-        return payment;
-    });
-
-    return result;
-}
-
-const getPaymentByParticipation = async (participationId: string) => {
-    const payment = await prisma.payment.findUnique({
-        where: { participationId },
-        include: {
-            participation: {
-                include: { event: true }
-            }
-        }
-    });
-
-    if (!payment) {
-        throw new AppError(status.NOT_FOUND, "Payment not found");
+      });
+      console.log(
+        `Payment confirmed successfully for participation ${participationId} and payment ${paymentId}`,
+      );
+      break;
     }
-    return payment;
-}
+
+    case "checkout.session.expired": {
+      const session = event.data.object as Stripe.Checkout.Session;
+      console.log(
+        `Checkout session expired for session ${session.id}. Marking associated payment as failed`,
+      );
+      break;
+    }
+    case "payment_intent.payment_failed": {
+      const session = event.data.object as Stripe.PaymentIntent;
+      console.log(
+        `Payment intent failed for session ${session.id}. Marking associated payment as failed`,
+      );
+      break;
+    }
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+
+  return {
+    message: `Webhook event ${event.id} handled successfully`,
+  };
+};
 
 export const PaymentService = {
-    createPaymentIntent,
-    confirmPayment,
-    getPaymentByParticipation
-}
+  handleStripeWebhookEvent,
+};

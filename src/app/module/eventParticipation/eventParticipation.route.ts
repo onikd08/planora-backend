@@ -13,6 +13,20 @@ router.post(
   validateRequest(EventParticipationValidation.createParticipationValidation),
   EventParticipationController.joinEvent,
 );
+
+router.post(
+  "/join-with-pay-later",
+  auth(UserRole.USER, UserRole.ADMIN),
+  validateRequest(EventParticipationValidation.createParticipationValidation),
+  EventParticipationController.joinEventWithPayLater,
+);
+
+router.post(
+  "/initiate-payment/:participationId",
+  auth(UserRole.USER, UserRole.ADMIN),
+  EventParticipationController.initiatePayment,
+);
+
 router.get(
   "/my-participations",
   auth(UserRole.USER, UserRole.ADMIN),

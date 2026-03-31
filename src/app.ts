@@ -5,8 +5,16 @@ import envVars from "./config/env";
 import { notFound } from "./app/middleware/notFound";
 import { globalErrorHandler } from "./app/middleware/globalErrorHandler";
 import { IndexRoutes } from "./app/routes";
+import { PaymentController } from "./app/module/payment/payment.controller";
 
 const app: Application = express();
+
+// stripe webhook
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  PaymentController.handleStripeWebhookEvent,
+);
 
 // Enable URL-encoded form data parsing
 app.use(express.urlencoded({ extended: true }));
@@ -27,7 +35,6 @@ app.use(
 // application routes
 
 app.use("/api/v1", IndexRoutes);
-
 
 app.get("/", async (req: Request, res: Response) => {
   res.send("Hello from Planora-Backend");

@@ -5,34 +5,77 @@ import { EventParticipationService } from "./eventParticipation.service";
 import AppError from "../../errorHelpers/AppError";
 
 const joinEvent = catchAsync(async (req, res) => {
-    if (!req.user) {
-        throw new AppError(status.UNAUTHORIZED, "Unauthorized");
-    }
+  if (!req.user) {
+    throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+  }
 
-    const result = await EventParticipationService.joinEvent(req.user.id as string, req.body.eventId);
-    sendResponse(res, {
-        statusCode: status.CREATED,
-        success: true,
-        message: "Successfully joined the event",
-        data: result,
-    });
+  const result = await EventParticipationService.joinEvent(
+    req.user.id as string,
+    req.body.eventId,
+  );
+  sendResponse(res, {
+    statusCode: status.CREATED,
+    success: true,
+    message: "Successfully joined the event",
+    data: result,
+  });
+});
+
+const joinEventWithPayLater = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+  }
+
+  const payload = req.body;
+  const user = req.user;
+
+  const result = await EventParticipationService.joinEventWithPayLater(
+    user.id as string,
+    payload.eventId,
+  );
+  sendResponse(res, {
+    statusCode: status.CREATED,
+    success: true,
+    message: "Successfully joined the event, please complete the payment",
+    data: result,
+  });
+});
+
+const initiatePayment = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+  }
+
+  const result = await EventParticipationService.initiatePayment(
+    req.params.participationId as string,
+  );
+  sendResponse(res, {
+    statusCode: status.CREATED,
+    success: true,
+    message: "Successfully initiated payment",
+    data: result,
+  });
 });
 
 const getMyParticipations = catchAsync(async (req, res) => {
-    if (!req.user) {
-        throw new AppError(status.UNAUTHORIZED, "Unauthorized");
-    }
+  if (!req.user) {
+    throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+  }
 
-    const result = await EventParticipationService.getMyParticipations(req.user.id as string);
-    sendResponse(res, {
-        statusCode: status.OK,
-        success: true,
-        message: "Participations fetched successfully",
-        data: result,
-    });
+  const result = await EventParticipationService.getMyParticipations(
+    req.user.id as string,
+  );
+  sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: "Participations fetched successfully",
+    data: result,
+  });
 });
 
 export const EventParticipationController = {
-    joinEvent,
-    getMyParticipations
-}
+  joinEvent,
+  getMyParticipations,
+  joinEventWithPayLater,
+  initiatePayment,
+};
