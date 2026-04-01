@@ -1,13 +1,13 @@
 import { prisma } from "../../lib/prisma";
 import AppError from "../../errorHelpers/AppError";
 import status from "http-status";
-import { uuidv7 } from "zod";
 import { stripe } from "../../lib/stripe";
 import envVars from "../../../config/env";
 import {
   ParticipationStatus,
   PaymentStatus,
 } from "../../../generated/prisma/enums";
+import { uuidv7 } from "uuidv7";
 
 const joinEvent = async (userId: string, eventId: string) => {
   // 1. Initial Checks (Outside Transaction to save resources)
@@ -153,6 +153,7 @@ const joinEventWithPayLater = async (userId: string, eventId: string) => {
     });
 
     const transactionId = `TXN-${uuidv7()}`;
+    console.log(transactionId);
     const paymentData = await tx.payment.create({
       data: {
         participationId: participation.id,
