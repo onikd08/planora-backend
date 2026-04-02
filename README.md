@@ -45,30 +45,34 @@ Planora is built with a modern and powerful tech stack designed for speed, relia
 ### Installation
 
 1. **Clone the repository:**
+
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/onikd08/planora-backend.git
    cd planora-backend
    ```
 
 2. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
 3. **Environment Setup:**
    Create a `.env` file in the root directory and add the following:
+
    ```env
    NODE_ENV=development
    PORT=4000
    DATABASE_URL=your_postgresql_url
    JWT_ACCESS_SECRET=your_secret
    JWT_REFRESH_SECRET=your_secret
-   FRONTEND_URL=http://localhost:3000
+   FRONTEND_URL=http://localhost:3000 || vercel_url
    STRIPE_SECRET_KEY=your_stripe_key
    STRIPE_WEBHOOK_SECRET=your_webhook_secret
    ```
 
 4. **Prisma Setup:**
+
    ```bash
    npm run generate
    npm run migrate
@@ -94,16 +98,16 @@ Planora is built with a modern and powerful tech stack designed for speed, relia
 
 ## 🛤️ API Endpoints (v1)
 
-| Prefix | Description |
-| :--- | :--- |
-| `/api/v1/auth` | Login, Registration, Password Management |
-| `/api/v1/users` | User profile and management |
-| `/api/v1/events` | Event creation, listing, and details |
-| `/api/v1/event-categories` | Manage event categories |
-| `/api/v1/participations` | Event registrations and tickets |
-| `/api/v1/reviews` | Post and view event reviews |
-| `/api/v1/dashboard` | Administrative and user statistics |
-| `/webhook` | Stripe Webhook Endpoint (Root level) |
+| Prefix                     | Description                              |
+| :------------------------- | :--------------------------------------- |
+| `/api/v1/auth`             | Login, Registration, Password Management |
+| `/api/v1/users`            | User profile and management              |
+| `/api/v1/events`           | Event creation, listing, and details     |
+| `/api/v1/event-categories` | Manage event categories                  |
+| `/api/v1/participations`   | Event registrations and tickets          |
+| `/api/v1/reviews`          | Post and view event reviews              |
+| `/api/v1/dashboard`        | Administrative and user statistics       |
+| `/webhook`                 | Stripe Webhook Endpoint (Root level)     |
 
 ---
 

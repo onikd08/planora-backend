@@ -1,0 +1,2239 @@
+// src/app.ts
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser";
+
+// src/config/env.ts
+import dotenv from "dotenv";
+
+// src/app/errorHelpers/AppError.ts
+var AppError = class extends Error {
+  statusCode;
+  constructor(statusCode, message, stack = "") {
+    super(message);
+    this.statusCode = statusCode;
+    if (stack) {
+      this.stack = stack;
+    } else {
+      Error.captureStackTrace(this, this.constructor);
+    }
+  }
+};
+var AppError_default = AppError;
+
+// src/config/env.ts
+import status from "http-status";
+dotenv.config();
+var loadEnvVariables = () => {
+  const requiredEnvVariables = [
+    "NODE_ENV",
+    "PORT",
+    "DATABASE_URL",
+    "FRONTEND_URL",
+    "ADMIN_EMAIL",
+    "ADMIN_PASSWORD",
+    "ACCESS_TOKEN_SECRET",
+    "ACCESS_TOKEN_EXPIRES_IN",
+    "REFRESH_TOKEN_SECRET",
+    "REFRESH_TOKEN_EXPIRES_IN",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET"
+  ];
+  requiredEnvVariables.forEach((envVariable) => {
+    if (!process.env[envVariable]) {
+      throw new AppError_default(
+        status.BAD_REQUEST,
+        `Missing environment variable: ${envVariable}`
+      );
+    }
+  });
+  return {
+    NODE_ENV: process.env.NODE_ENV,
+    PORT: process.env.PORT,
+    DATABASE_URL: process.env.DATABASE_URL,
+    FRONTEND_URL: process.env.FRONTEND_URL,
+    ADMIN_EMAIL: process.env.ADMIN_EMAIL,
+    ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+    ACCESS_TOKEN_SECRET: process.env.ACCESS_TOKEN_SECRET,
+    ACCESS_TOKEN_EXPIRES_IN: process.env.ACCESS_TOKEN_EXPIRES_IN,
+    REFRESH_TOKEN_SECRET: process.env.REFRESH_TOKEN_SECRET,
+    REFRESH_TOKEN_EXPIRES_IN: process.env.REFRESH_TOKEN_EXPIRES_IN,
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET
+  };
+};
+var envVars = loadEnvVariables();
+var env_default = envVars;
+
+// src/app/middleware/notFound.ts
+import status2 from "http-status";
+var notFound = (req, res) => {
+  res.status(status2.NOT_FOUND).json({
+    success: false,
+    message: `Route ${req.originalUrl} not found`
+  });
+};
+
+// src/app/middleware/globalErrorHandler.ts
+import status4 from "http-status";
+import z from "zod";
+
+// src/app/errorHelpers/handleZodError.ts
+import status3 from "http-status";
+function handleZodError(error) {
+  const statusCode = status3.BAD_REQUEST;
+  const message = "Zod Validation Error";
+  const errorSources = [];
+  error.issues.forEach((issue) => {
+    errorSources.push({
+      path: issue.path.join(" => "),
+      message: issue.message
+    });
+  });
+  return {
+    success: false,
+    statusCode,
+    message,
+    errorSources
+  };
+}
+
+// src/app/middleware/globalErrorHandler.ts
+var globalErrorHandler = async (error, req, res, next) => {
+  if (env_default.NODE_ENV === "development") {
+    console.log("Error from Global Error Handler: ", error);
+  }
+  let statusCode = status4.INTERNAL_SERVER_ERROR;
+  let message = "Internal Server Error";
+  let stack = void 0;
+  let errorSources = [];
+  if (error instanceof z.ZodError) {
+    const simplifiedError = handleZodError(error);
+    statusCode = simplifiedError.statusCode;
+    message = simplifiedError.message;
+    errorSources.push(...simplifiedError.errorSources);
+    stack = error.stack;
+  } else if (error instanceof AppError_default) {
+    statusCode = error.statusCode;
+    message = error.message;
+    stack = error.stack;
+    errorSources = [
+      {
+        path: "",
+        message: error.message
+      }
+    ];
+  } else if (error instanceof Error) {
+    message = error.message;
+    stack = error.stack;
+    errorSources = [
+      {
+        path: "",
+        message: error.message
+      }
+    ];
+  }
+  const errorResponse = {
+    success: false,
+    message,
+    errorSources,
+    error: env_default.NODE_ENV === "development" ? error : void 0,
+    stack: env_default.NODE_ENV === "development" ? stack : void 0
+  };
+  res.status(statusCode).json(errorResponse);
+};
+
+// src/app/routes/index.ts
+import { Router as Router8 } from "express";
+
+// src/app/module/user/user.route.ts
+import { Router } from "express";
+
+// src/app/module/user/user.controller.ts
+import status6 from "http-status";
+
+// src/generated/prisma/enums.ts
+var UserRole = {
+  USER: "USER",
+  ADMIN: "ADMIN"
+};
+var UserStatus = {
+  ACTIVE: "ACTIVE",
+  BANNED: "BANNED"
+};
+var ParticipationStatus = {
+  PENDING: "PENDING",
+  CONFIRMED: "CONFIRMED",
+  CANCELLED: "CANCELLED"
+};
+var PaymentStatus = {
+  PENDING: "PENDING",
+  PAID: "PAID",
+  FAILED: "FAILED",
+  REFUNDED: "REFUNDED"
+};
+
+// src/app/shared/catchAsync.ts
+function catchAsync(fn) {
+  return async function(req, res, next) {
+    try {
+      await fn(req, res, next);
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
+// src/app/shared/sendResponse.ts
+function sendResponse(res, responseData) {
+  const { statusCode, success, message, data } = responseData;
+  return res.status(statusCode).json({
+    success,
+    message,
+    data
+  });
+}
+
+// src/app/lib/prisma.ts
+import "dotenv/config";
+import { PrismaPg } from "@prisma/adapter-pg";
+
+// src/generated/prisma/client.ts
+import * as path from "path";
+import { fileURLToPath } from "url";
+
+// src/generated/prisma/internal/class.ts
+import * as runtime from "@prisma/client/runtime/client";
+var config = {
+  "previewFeatures": [],
+  "clientVersion": "7.5.0",
+  "engineVersion": "280c870be64f457428992c43c1f6d557fab6e29e",
+  "activeProvider": "postgresql",
+  "inlineSchema": 'model User {\n  id        String     @id @default(uuid())\n  firstName String\n  lastName  String\n  email     String     @unique\n  password  String\n  role      UserRole   @default(USER)\n  status    UserStatus @default(ACTIVE)\n\n  profilePhoto String?\n  phone        String?\n  gender       GENDER?\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  events              Event[]\n  eventParticipations EventParticipation[]\n  reviews             Review[]\n\n  @@index([firstName, lastName], name: "idx_user_name")\n  @@index([email], name: "idx_user_email")\n  @@map("users")\n}\n\nenum UserRole {\n  USER\n  ADMIN\n}\n\nenum UserStatus {\n  ACTIVE\n  BANNED\n}\n\nenum GENDER {\n  MALE\n  FEMALE\n  OTHER\n}\n\nenum ParticipationStatus {\n  PENDING\n  CONFIRMED\n  CANCELLED\n}\n\nenum PaymentStatus {\n  PENDING\n  PAID\n  FAILED\n  REFUNDED\n}\n\nmodel Event {\n  id String @id @default(uuid())\n\n  title       String\n  description String\n  imageURL    String?\n\n  isFeatured  Boolean @default(false)\n  isDeleted   Boolean @default(false)\n  isCancelled Boolean @default(false)\n\n  startTime DateTime\n  endTime   DateTime\n\n  country    String\n  city       String\n  address    String\n  postalCode String\n\n  fee      Float @default(0)\n  capacity Int\n\n  categoryId String\n  category   EventCategory @relation(fields: [categoryId], references: [id], onDelete: Restrict)\n\n  creatorId String\n  creator   User   @relation(fields: [creatorId], references: [id], onDelete: Cascade)\n\n  reviews Review[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  eventParticipations EventParticipation[]\n\n  @@index([title], name: "idx_event_title")\n  @@index([country, city], name: "idx_event_location")\n  @@index([categoryId], name: "idx_event_category")\n  @@index([creatorId], name: "idx_event_creator")\n  @@map("events")\n}\n\nmodel EventCategory {\n  id     String  @id @default(uuid())\n  name   String  @unique\n  icon   String\n  events Event[]\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  @@index([name], name: "idx_category_name")\n  @@map("event_categories")\n}\n\nmodel EventParticipation {\n  id String @id @default(uuid())\n\n  userId  String\n  eventId String\n\n  createdAt DateTime @default(now())\n  updatedAt DateTime @updatedAt\n\n  participationStatus ParticipationStatus @default(PENDING)\n\n  joinedAt DateTime @default(now())\n\n  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)\n  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)\n\n  payment Payment?\n\n  @@unique([userId, eventId])\n  @@index([userId], name: "idx_participation_user")\n  @@index([eventId], name: "idx_participation_event")\n  @@map("event_participations")\n}\n\nmodel Payment {\n  id                 String        @id @default(uuid())\n  amount             Float\n  transactionId      String        @unique\n  stripeEventId      String?       @unique\n  paymentStatus      PaymentStatus @default(PENDING)\n  paymentGatewayData Json?\n  createdAt          DateTime      @default(now())\n  updatedAt          DateTime      @updatedAt\n\n  participationId String             @unique\n  participation   EventParticipation @relation(fields: [participationId], references: [id], onDelete: Cascade)\n\n  @@index([participationId])\n  @@index([transactionId])\n  @@map("payments")\n}\n\nmodel Review {\n  id String @id @default(uuid())\n\n  userId  String\n  eventId String\n\n  rating  Int\n  comment String\n\n  createdAt DateTime @default(now())\n\n  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)\n  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)\n\n  @@unique([userId, eventId])\n  @@index([userId], name: "idx_review_user")\n  @@index([eventId], name: "idx_review_event")\n  @@map("reviews")\n}\n\n// This is your Prisma schema file,\n// learn more about it in the docs: https://pris.ly/d/prisma-schema\n\n// Get a free hosted Postgres database in seconds: `npx create-db`\n\ngenerator client {\n  provider = "prisma-client"\n  output   = "../../src/generated/prisma"\n}\n\ndatasource db {\n  provider = "postgresql"\n}\n',
+  "runtimeDataModel": {
+    "models": {},
+    "enums": {},
+    "types": {}
+  },
+  "parameterizationSchema": {
+    "strings": [],
+    "graph": ""
+  }
+};
+config.runtimeDataModel = JSON.parse('{"models":{"User":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"firstName","kind":"scalar","type":"String"},{"name":"lastName","kind":"scalar","type":"String"},{"name":"email","kind":"scalar","type":"String"},{"name":"password","kind":"scalar","type":"String"},{"name":"role","kind":"enum","type":"UserRole"},{"name":"status","kind":"enum","type":"UserStatus"},{"name":"profilePhoto","kind":"scalar","type":"String"},{"name":"phone","kind":"scalar","type":"String"},{"name":"gender","kind":"enum","type":"GENDER"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"events","kind":"object","type":"Event","relationName":"EventToUser"},{"name":"eventParticipations","kind":"object","type":"EventParticipation","relationName":"EventParticipationToUser"},{"name":"reviews","kind":"object","type":"Review","relationName":"ReviewToUser"}],"dbName":"users"},"Event":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"title","kind":"scalar","type":"String"},{"name":"description","kind":"scalar","type":"String"},{"name":"imageURL","kind":"scalar","type":"String"},{"name":"isFeatured","kind":"scalar","type":"Boolean"},{"name":"isDeleted","kind":"scalar","type":"Boolean"},{"name":"isCancelled","kind":"scalar","type":"Boolean"},{"name":"startTime","kind":"scalar","type":"DateTime"},{"name":"endTime","kind":"scalar","type":"DateTime"},{"name":"country","kind":"scalar","type":"String"},{"name":"city","kind":"scalar","type":"String"},{"name":"address","kind":"scalar","type":"String"},{"name":"postalCode","kind":"scalar","type":"String"},{"name":"fee","kind":"scalar","type":"Float"},{"name":"capacity","kind":"scalar","type":"Int"},{"name":"categoryId","kind":"scalar","type":"String"},{"name":"category","kind":"object","type":"EventCategory","relationName":"EventToEventCategory"},{"name":"creatorId","kind":"scalar","type":"String"},{"name":"creator","kind":"object","type":"User","relationName":"EventToUser"},{"name":"reviews","kind":"object","type":"Review","relationName":"EventToReview"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"eventParticipations","kind":"object","type":"EventParticipation","relationName":"EventToEventParticipation"}],"dbName":"events"},"EventCategory":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"name","kind":"scalar","type":"String"},{"name":"icon","kind":"scalar","type":"String"},{"name":"events","kind":"object","type":"Event","relationName":"EventToEventCategory"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"}],"dbName":"event_categories"},"EventParticipation":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"eventId","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"participationStatus","kind":"enum","type":"ParticipationStatus"},{"name":"joinedAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"EventParticipationToUser"},{"name":"event","kind":"object","type":"Event","relationName":"EventToEventParticipation"},{"name":"payment","kind":"object","type":"Payment","relationName":"EventParticipationToPayment"}],"dbName":"event_participations"},"Payment":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"amount","kind":"scalar","type":"Float"},{"name":"transactionId","kind":"scalar","type":"String"},{"name":"stripeEventId","kind":"scalar","type":"String"},{"name":"paymentStatus","kind":"enum","type":"PaymentStatus"},{"name":"paymentGatewayData","kind":"scalar","type":"Json"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"updatedAt","kind":"scalar","type":"DateTime"},{"name":"participationId","kind":"scalar","type":"String"},{"name":"participation","kind":"object","type":"EventParticipation","relationName":"EventParticipationToPayment"}],"dbName":"payments"},"Review":{"fields":[{"name":"id","kind":"scalar","type":"String"},{"name":"userId","kind":"scalar","type":"String"},{"name":"eventId","kind":"scalar","type":"String"},{"name":"rating","kind":"scalar","type":"Int"},{"name":"comment","kind":"scalar","type":"String"},{"name":"createdAt","kind":"scalar","type":"DateTime"},{"name":"user","kind":"object","type":"User","relationName":"ReviewToUser"},{"name":"event","kind":"object","type":"Event","relationName":"EventToReview"}],"dbName":"reviews"}},"enums":{},"types":{}}');
+config.parameterizationSchema = {
+  strings: JSON.parse('["where","orderBy","cursor","events","_count","category","creator","user","event","reviews","participation","payment","eventParticipations","User.findUnique","User.findUniqueOrThrow","User.findFirst","User.findFirstOrThrow","User.findMany","data","User.createOne","User.createMany","User.createManyAndReturn","User.updateOne","User.updateMany","User.updateManyAndReturn","create","update","User.upsertOne","User.deleteOne","User.deleteMany","having","_min","_max","User.groupBy","User.aggregate","Event.findUnique","Event.findUniqueOrThrow","Event.findFirst","Event.findFirstOrThrow","Event.findMany","Event.createOne","Event.createMany","Event.createManyAndReturn","Event.updateOne","Event.updateMany","Event.updateManyAndReturn","Event.upsertOne","Event.deleteOne","Event.deleteMany","_avg","_sum","Event.groupBy","Event.aggregate","EventCategory.findUnique","EventCategory.findUniqueOrThrow","EventCategory.findFirst","EventCategory.findFirstOrThrow","EventCategory.findMany","EventCategory.createOne","EventCategory.createMany","EventCategory.createManyAndReturn","EventCategory.updateOne","EventCategory.updateMany","EventCategory.updateManyAndReturn","EventCategory.upsertOne","EventCategory.deleteOne","EventCategory.deleteMany","EventCategory.groupBy","EventCategory.aggregate","EventParticipation.findUnique","EventParticipation.findUniqueOrThrow","EventParticipation.findFirst","EventParticipation.findFirstOrThrow","EventParticipation.findMany","EventParticipation.createOne","EventParticipation.createMany","EventParticipation.createManyAndReturn","EventParticipation.updateOne","EventParticipation.updateMany","EventParticipation.updateManyAndReturn","EventParticipation.upsertOne","EventParticipation.deleteOne","EventParticipation.deleteMany","EventParticipation.groupBy","EventParticipation.aggregate","Payment.findUnique","Payment.findUniqueOrThrow","Payment.findFirst","Payment.findFirstOrThrow","Payment.findMany","Payment.createOne","Payment.createMany","Payment.createManyAndReturn","Payment.updateOne","Payment.updateMany","Payment.updateManyAndReturn","Payment.upsertOne","Payment.deleteOne","Payment.deleteMany","Payment.groupBy","Payment.aggregate","Review.findUnique","Review.findUniqueOrThrow","Review.findFirst","Review.findFirstOrThrow","Review.findMany","Review.createOne","Review.createMany","Review.createManyAndReturn","Review.updateOne","Review.updateMany","Review.updateManyAndReturn","Review.upsertOne","Review.deleteOne","Review.deleteMany","Review.groupBy","Review.aggregate","AND","OR","NOT","id","userId","eventId","rating","comment","createdAt","equals","in","notIn","lt","lte","gt","gte","not","contains","startsWith","endsWith","amount","transactionId","stripeEventId","PaymentStatus","paymentStatus","paymentGatewayData","updatedAt","participationId","string_contains","string_starts_with","string_ends_with","array_starts_with","array_ends_with","array_contains","ParticipationStatus","participationStatus","joinedAt","name","icon","every","some","none","title","description","imageURL","isFeatured","isDeleted","isCancelled","startTime","endTime","country","city","address","postalCode","fee","capacity","categoryId","creatorId","firstName","lastName","email","password","UserRole","role","UserStatus","status","profilePhoto","phone","GENDER","gender","userId_eventId","is","isNot","connectOrCreate","upsert","disconnect","delete","connect","createMany","set","updateMany","deleteMany","increment","decrement","multiply","divide"]'),
+  graph: "ngM6YBIDAADIAQAgCQAA3QEAIAwAANwBACB1AADXAQAwdgAAGwAQdwAA1wEAMHgBAAAAAX1AAL8BACGPAUAAvwEAIa8BAQDHAQAhsAEBAMcBACGxAQEAAAABsgEBAMcBACG0AQAA2AG0ASK2AQAA2QG2ASK3AQEA2gEAIbgBAQDaAQAhugEAANsBugEjAQAAAAEAIBoFAADpAQAgBgAA4QEAIAkAAN0BACAMAADcAQAgdQAA5wEAMHYAAAMAEHcAAOcBADB4AQDHAQAhfUAAvwEAIY8BQAC_AQAhnwEBAMcBACGgAQEAxwEAIaEBAQDaAQAhogEgAOgBACGjASAA6AEAIaQBIADoAQAhpQFAAL8BACGmAUAAvwEAIacBAQDHAQAhqAEBAMcBACGpAQEAxwEAIaoBAQDHAQAhqwEIALwBACGsAQIA5gEAIa0BAQDHAQAhrgEBAMcBACEFBQAA9QIAIAYAAPICACAJAADxAgAgDAAA8AIAIKEBAAD2AQAgGgUAAOkBACAGAADhAQAgCQAA3QEAIAwAANwBACB1AADnAQAwdgAAAwAQdwAA5wEAMHgBAAAAAX1AAL8BACGPAUAAvwEAIZ8BAQDHAQAhoAEBAMcBACGhAQEA2gEAIaIBIADoAQAhowEgAOgBACGkASAA6AEAIaUBQAC_AQAhpgFAAL8BACGnAQEAxwEAIagBAQDHAQAhqQEBAMcBACGqAQEAxwEAIasBCAC8AQAhrAECAOYBACGtAQEAxwEAIa4BAQDHAQAhAwAAAAMAIAEAAAQAMAIAAAUAIAMAAAADACABAAAEADACAAAFACABAAAAAwAgCwcAAOEBACAIAADiAQAgdQAA5QEAMHYAAAkAEHcAAOUBADB4AQDHAQAheQEAxwEAIXoBAMcBACF7AgDmAQAhfAEAxwEAIX1AAL8BACECBwAA8gIAIAgAAPMCACAMBwAA4QEAIAgAAOIBACB1AADlAQAwdgAACQAQdwAA5QEAMHgBAAAAAXkBAMcBACF6AQDHAQAhewIA5gEAIXwBAMcBACF9QAC_AQAhuwEAAOQBACADAAAACQAgAQAACgAwAgAACwAgDQcAAOEBACAIAADiAQAgCwAA4wEAIHUAAN8BADB2AAANABB3AADfAQAweAEAxwEAIXkBAMcBACF6AQDHAQAhfUAAvwEAIY8BQAC_AQAhmAEAAOABmAEimQFAAL8BACEDBwAA8gIAIAgAAPMCACALAAD0AgAgDgcAAOEBACAIAADiAQAgCwAA4wEAIHUAAN8BADB2AAANABB3AADfAQAweAEAAAABeQEAxwEAIXoBAMcBACF9QAC_AQAhjwFAAL8BACGYAQAA4AGYASKZAUAAvwEAIbsBAADeAQAgAwAAAA0AIAEAAA4AMAIAAA8AIA0KAADAAQAgdQAAuwEAMHYAABEAEHcAALsBADB4AQDHAQAhfUAAvwEAIYkBCAC8AQAhigEBAMcBACGLAQEA2gEAIY0BAAC9AY0BIo4BAAC-AQAgjwFAAL8BACGQAQEAxwEAIQEAAAARACABAAAACQAgAQAAAA0AIAMAAAANACABAAAOADACAAAPACADAAAACQAgAQAACgAwAgAACwAgAQAAAAMAIAEAAAANACABAAAACQAgAQAAAAEAIBIDAADIAQAgCQAA3QEAIAwAANwBACB1AADXAQAwdgAAGwAQdwAA1wEAMHgBAMcBACF9QAC_AQAhjwFAAL8BACGvAQEAxwEAIbABAQDHAQAhsQEBAMcBACGyAQEAxwEAIbQBAADYAbQBIrYBAADZAbYBIrcBAQDaAQAhuAEBANoBACG6AQAA2wG6ASMGAwAAwQIAIAkAAPECACAMAADwAgAgtwEAAPYBACC4AQAA9gEAILoBAAD2AQAgAwAAABsAIAEAABwAMAIAAAEAIAMAAAAbACABAAAcADACAAABACADAAAAGwAgAQAAHAAwAgAAAQAgDwMAAO0CACAJAADvAgAgDAAA7gIAIHgBAAAAAX1AAAAAAY8BQAAAAAGvAQEAAAABsAEBAAAAAbEBAQAAAAGyAQEAAAABtAEAAAC0AQK2AQAAALYBArcBAQAAAAG4AQEAAAABugEAAAC6AQMBEgAAIAAgDHgBAAAAAX1AAAAAAY8BQAAAAAGvAQEAAAABsAEBAAAAAbEBAQAAAAGyAQEAAAABtAEAAAC0AQK2AQAAALYBArcBAQAAAAG4AQEAAAABugEAAAC6AQMBEgAAIgAwARIAACIAMA8DAADPAgAgCQAA0QIAIAwAANACACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhrwEBAO8BACGwAQEA7wEAIbEBAQDvAQAhsgEBAO8BACG0AQAAzAK0ASK2AQAAzQK2ASK3AQEA_QEAIbgBAQD9AQAhugEAAM4CugEjAgAAAAEAIBIAACUAIAx4AQDvAQAhfUAA8QEAIY8BQADxAQAhrwEBAO8BACGwAQEA7wEAIbEBAQDvAQAhsgEBAO8BACG0AQAAzAK0ASK2AQAAzQK2ASK3AQEA_QEAIbgBAQD9AQAhugEAAM4CugEjAgAAABsAIBIAACcAIAIAAAAbACASAAAnACADAAAAAQAgGQAAIAAgGgAAJQAgAQAAAAEAIAEAAAAbACAGBAAAyQIAIB8AAMsCACAgAADKAgAgtwEAAPYBACC4AQAA9gEAILoBAAD2AQAgD3UAAM0BADB2AAAuABB3AADNAQAweAEApQEAIX1AAKcBACGPAUAApwEAIa8BAQClAQAhsAEBAKUBACGxAQEApQEAIbIBAQClAQAhtAEAAM4BtAEitgEAAM8BtgEitwEBALEBACG4AQEAsQEAIboBAADQAboBIwMAAAAbACABAAAtADAeAAAuACADAAAAGwAgAQAAHAAwAgAAAQAgAQAAAAUAIAEAAAAFACADAAAAAwAgAQAABAAwAgAABQAgAwAAAAMAIAEAAAQAMAIAAAUAIAMAAAADACABAAAEADACAAAFACAXBQAAyAIAIAYAAL0CACAJAAC-AgAgDAAAvwIAIHgBAAAAAX1AAAAAAY8BQAAAAAGfAQEAAAABoAEBAAAAAaEBAQAAAAGiASAAAAABowEgAAAAAaQBIAAAAAGlAUAAAAABpgFAAAAAAacBAQAAAAGoAQEAAAABqQEBAAAAAaoBAQAAAAGrAQgAAAABrAECAAAAAa0BAQAAAAGuAQEAAAABARIAADYAIBN4AQAAAAF9QAAAAAGPAUAAAAABnwEBAAAAAaABAQAAAAGhAQEAAAABogEgAAAAAaMBIAAAAAGkASAAAAABpQFAAAAAAaYBQAAAAAGnAQEAAAABqAEBAAAAAakBAQAAAAGqAQEAAAABqwEIAAAAAawBAgAAAAGtAQEAAAABrgEBAAAAAQESAAA4ADABEgAAOAAwFwUAAMcCACAGAAChAgAgCQAAogIAIAwAAKMCACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhnwEBAO8BACGgAQEA7wEAIaEBAQD9AQAhogEgAJ8CACGjASAAnwIAIaQBIACfAgAhpQFAAPEBACGmAUAA8QEAIacBAQDvAQAhqAEBAO8BACGpAQEA7wEAIaoBAQDvAQAhqwEIAPwBACGsAQIA8AEAIa0BAQDvAQAhrgEBAO8BACECAAAABQAgEgAAOwAgE3gBAO8BACF9QADxAQAhjwFAAPEBACGfAQEA7wEAIaABAQDvAQAhoQEBAP0BACGiASAAnwIAIaMBIACfAgAhpAEgAJ8CACGlAUAA8QEAIaYBQADxAQAhpwEBAO8BACGoAQEA7wEAIakBAQDvAQAhqgEBAO8BACGrAQgA_AEAIawBAgDwAQAhrQEBAO8BACGuAQEA7wEAIQIAAAADACASAAA9ACACAAAAAwAgEgAAPQAgAwAAAAUAIBkAADYAIBoAADsAIAEAAAAFACABAAAAAwAgBgQAAMICACAfAADFAgAgIAAAxAIAIDEAAMMCACAyAADGAgAgoQEAAPYBACAWdQAAyQEAMHYAAEQAEHcAAMkBADB4AQClAQAhfUAApwEAIY8BQACnAQAhnwEBAKUBACGgAQEApQEAIaEBAQCxAQAhogEgAMoBACGjASAAygEAIaQBIADKAQAhpQFAAKcBACGmAUAApwEAIacBAQClAQAhqAEBAKUBACGpAQEApQEAIaoBAQClAQAhqwEIALABACGsAQIApgEAIa0BAQClAQAhrgEBAKUBACEDAAAAAwAgAQAAQwAwHgAARAAgAwAAAAMAIAEAAAQAMAIAAAUAIAkDAADIAQAgdQAAxgEAMHYAAEoAEHcAAMYBADB4AQAAAAF9QAC_AQAhjwFAAL8BACGaAQEAAAABmwEBAMcBACEBAAAARwAgAQAAAEcAIAkDAADIAQAgdQAAxgEAMHYAAEoAEHcAAMYBADB4AQDHAQAhfUAAvwEAIY8BQAC_AQAhmgEBAMcBACGbAQEAxwEAIQEDAADBAgAgAwAAAEoAIAEAAEsAMAIAAEcAIAMAAABKACABAABLADACAABHACADAAAASgAgAQAASwAwAgAARwAgBgMAAMACACB4AQAAAAF9QAAAAAGPAUAAAAABmgEBAAAAAZsBAQAAAAEBEgAATwAgBXgBAAAAAX1AAAAAAY8BQAAAAAGaAQEAAAABmwEBAAAAAQESAABRADABEgAAUQAwBgMAAJQCACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhmgEBAO8BACGbAQEA7wEAIQIAAABHACASAABUACAFeAEA7wEAIX1AAPEBACGPAUAA8QEAIZoBAQDvAQAhmwEBAO8BACECAAAASgAgEgAAVgAgAgAAAEoAIBIAAFYAIAMAAABHACAZAABPACAaAABUACABAAAARwAgAQAAAEoAIAMEAACRAgAgHwAAkwIAICAAAJICACAIdQAAxQEAMHYAAF0AEHcAAMUBADB4AQClAQAhfUAApwEAIY8BQACnAQAhmgEBAKUBACGbAQEApQEAIQMAAABKACABAABcADAeAABdACADAAAASgAgAQAASwAwAgAARwAgAQAAAA8AIAEAAAAPACADAAAADQAgAQAADgAwAgAADwAgAwAAAA0AIAEAAA4AMAIAAA8AIAMAAAANACABAAAOADACAAAPACAKBwAAjgIAIAgAAI8CACALAACQAgAgeAEAAAABeQEAAAABegEAAAABfUAAAAABjwFAAAAAAZgBAAAAmAECmQFAAAAAAQESAABlACAHeAEAAAABeQEAAAABegEAAAABfUAAAAABjwFAAAAAAZgBAAAAmAECmQFAAAAAAQESAABnADABEgAAZwAwCgcAAIYCACAIAACHAgAgCwAAiAIAIHgBAO8BACF5AQDvAQAhegEA7wEAIX1AAPEBACGPAUAA8QEAIZgBAACFApgBIpkBQADxAQAhAgAAAA8AIBIAAGoAIAd4AQDvAQAheQEA7wEAIXoBAO8BACF9QADxAQAhjwFAAPEBACGYAQAAhQKYASKZAUAA8QEAIQIAAAANACASAABsACACAAAADQAgEgAAbAAgAwAAAA8AIBkAAGUAIBoAAGoAIAEAAAAPACABAAAADQAgAwQAAIICACAfAACEAgAgIAAAgwIAIAp1AADBAQAwdgAAcwAQdwAAwQEAMHgBAKUBACF5AQClAQAhegEApQEAIX1AAKcBACGPAUAApwEAIZgBAADCAZgBIpkBQACnAQAhAwAAAA0AIAEAAHIAMB4AAHMAIAMAAAANACABAAAOADACAAAPACANCgAAwAEAIHUAALsBADB2AAARABB3AAC7AQAweAEAAAABfUAAvwEAIYkBCAC8AQAhigEBAAAAAYsBAQAAAAGNAQAAvQGNASKOAQAAvgEAII8BQAC_AQAhkAEBAAAAAQEAAAB2ACABAAAAdgAgAwoAAIECACCLAQAA9gEAII4BAAD2AQAgAwAAABEAIAEAAHkAMAIAAHYAIAMAAAARACABAAB5ADACAAB2ACADAAAAEQAgAQAAeQAwAgAAdgAgCgoAAIACACB4AQAAAAF9QAAAAAGJAQgAAAABigEBAAAAAYsBAQAAAAGNAQAAAI0BAo4BgAAAAAGPAUAAAAABkAEBAAAAAQESAAB9ACAJeAEAAAABfUAAAAABiQEIAAAAAYoBAQAAAAGLAQEAAAABjQEAAACNAQKOAYAAAAABjwFAAAAAAZABAQAAAAEBEgAAfwAwARIAAH8AMAoKAAD_AQAgeAEA7wEAIX1AAPEBACGJAQgA_AEAIYoBAQDvAQAhiwEBAP0BACGNAQAA_gGNASKOAYAAAAABjwFAAPEBACGQAQEA7wEAIQIAAAB2ACASAACCAQAgCXgBAO8BACF9QADxAQAhiQEIAPwBACGKAQEA7wEAIYsBAQD9AQAhjQEAAP4BjQEijgGAAAAAAY8BQADxAQAhkAEBAO8BACECAAAAEQAgEgAAhAEAIAIAAAARACASAACEAQAgAwAAAHYAIBkAAH0AIBoAAIIBACABAAAAdgAgAQAAABEAIAcEAAD3AQAgHwAA-gEAICAAAPkBACAxAAD4AQAgMgAA-wEAIIsBAAD2AQAgjgEAAPYBACAMdQAArwEAMHYAAIsBABB3AACvAQAweAEApQEAIX1AAKcBACGJAQgAsAEAIYoBAQClAQAhiwEBALEBACGNAQAAsgGNASKOAQAAswEAII8BQACnAQAhkAEBAKUBACEDAAAAEQAgAQAAigEAMB4AAIsBACADAAAAEQAgAQAAeQAwAgAAdgAgAQAAAAsAIAEAAAALACADAAAACQAgAQAACgAwAgAACwAgAwAAAAkAIAEAAAoAMAIAAAsAIAMAAAAJACABAAAKADACAAALACAIBwAA9AEAIAgAAPUBACB4AQAAAAF5AQAAAAF6AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAEBEgAAkwEAIAZ4AQAAAAF5AQAAAAF6AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAEBEgAAlQEAMAESAACVAQAwCAcAAPIBACAIAADzAQAgeAEA7wEAIXkBAO8BACF6AQDvAQAhewIA8AEAIXwBAO8BACF9QADxAQAhAgAAAAsAIBIAAJgBACAGeAEA7wEAIXkBAO8BACF6AQDvAQAhewIA8AEAIXwBAO8BACF9QADxAQAhAgAAAAkAIBIAAJoBACACAAAACQAgEgAAmgEAIAMAAAALACAZAACTAQAgGgAAmAEAIAEAAAALACABAAAACQAgBQQAAOoBACAfAADtAQAgIAAA7AEAIDEAAOsBACAyAADuAQAgCXUAAKQBADB2AAChAQAQdwAApAEAMHgBAKUBACF5AQClAQAhegEApQEAIXsCAKYBACF8AQClAQAhfUAApwEAIQMAAAAJACABAACgAQAwHgAAoQEAIAMAAAAJACABAAAKADACAAALACAJdQAApAEAMHYAAKEBABB3AACkAQAweAEApQEAIXkBAKUBACF6AQClAQAhewIApgEAIXwBAKUBACF9QACnAQAhDgQAAKkBACAfAACuAQAgIAAArgEAIH4BAAAAAX8BAAAABIABAQAAAASBAQEAAAABggEBAAAAAYMBAQAAAAGEAQEAAAABhQEBAK0BACGGAQEAAAABhwEBAAAAAYgBAQAAAAENBAAAqQEAIB8AAKkBACAgAACpAQAgMQAArAEAIDIAAKkBACB-AgAAAAF_AgAAAASAAQIAAAAEgQECAAAAAYIBAgAAAAGDAQIAAAABhAECAAAAAYUBAgCrAQAhCwQAAKkBACAfAACqAQAgIAAAqgEAIH5AAAAAAX9AAAAABIABQAAAAASBAUAAAAABggFAAAAAAYMBQAAAAAGEAUAAAAABhQFAAKgBACELBAAAqQEAIB8AAKoBACAgAACqAQAgfkAAAAABf0AAAAAEgAFAAAAABIEBQAAAAAGCAUAAAAABgwFAAAAAAYQBQAAAAAGFAUAAqAEAIQh-AgAAAAF_AgAAAASAAQIAAAAEgQECAAAAAYIBAgAAAAGDAQIAAAABhAECAAAAAYUBAgCpAQAhCH5AAAAAAX9AAAAABIABQAAAAASBAUAAAAABggFAAAAAAYMBQAAAAAGEAUAAAAABhQFAAKoBACENBAAAqQEAIB8AAKkBACAgAACpAQAgMQAArAEAIDIAAKkBACB-AgAAAAF_AgAAAASAAQIAAAAEgQECAAAAAYIBAgAAAAGDAQIAAAABhAECAAAAAYUBAgCrAQAhCH4IAAAAAX8IAAAABIABCAAAAASBAQgAAAABggEIAAAAAYMBCAAAAAGEAQgAAAABhQEIAKwBACEOBAAAqQEAIB8AAK4BACAgAACuAQAgfgEAAAABfwEAAAAEgAEBAAAABIEBAQAAAAGCAQEAAAABgwEBAAAAAYQBAQAAAAGFAQEArQEAIYYBAQAAAAGHAQEAAAABiAEBAAAAAQt-AQAAAAF_AQAAAASAAQEAAAAEgQEBAAAAAYIBAQAAAAGDAQEAAAABhAEBAAAAAYUBAQCuAQAhhgEBAAAAAYcBAQAAAAGIAQEAAAABDHUAAK8BADB2AACLAQAQdwAArwEAMHgBAKUBACF9QACnAQAhiQEIALABACGKAQEApQEAIYsBAQCxAQAhjQEAALIBjQEijgEAALMBACCPAUAApwEAIZABAQClAQAhDQQAAKkBACAfAACsAQAgIAAArAEAIDEAAKwBACAyAACsAQAgfggAAAABfwgAAAAEgAEIAAAABIEBCAAAAAGCAQgAAAABgwEIAAAAAYQBCAAAAAGFAQgAugEAIQ4EAAC0AQAgHwAAuQEAICAAALkBACB-AQAAAAF_AQAAAAWAAQEAAAAFgQEBAAAAAYIBAQAAAAGDAQEAAAABhAEBAAAAAYUBAQC4AQAhhgEBAAAAAYcBAQAAAAGIAQEAAAABBwQAAKkBACAfAAC3AQAgIAAAtwEAIH4AAACNAQJ_AAAAjQEIgAEAAACNAQiFAQAAtgGNASIPBAAAtAEAIB8AALUBACAgAAC1AQAgfoAAAAABgQGAAAAAAYIBgAAAAAGDAYAAAAABhAGAAAAAAYUBgAAAAAGRAQEAAAABkgEBAAAAAZMBAQAAAAGUAYAAAAABlQGAAAAAAZYBgAAAAAEIfgIAAAABfwIAAAAFgAECAAAABYEBAgAAAAGCAQIAAAABgwECAAAAAYQBAgAAAAGFAQIAtAEAIQx-gAAAAAGBAYAAAAABggGAAAAAAYMBgAAAAAGEAYAAAAABhQGAAAAAAZEBAQAAAAGSAQEAAAABkwEBAAAAAZQBgAAAAAGVAYAAAAABlgGAAAAAAQcEAACpAQAgHwAAtwEAICAAALcBACB-AAAAjQECfwAAAI0BCIABAAAAjQEIhQEAALYBjQEiBH4AAACNAQJ_AAAAjQEIgAEAAACNAQiFAQAAtwGNASIOBAAAtAEAIB8AALkBACAgAAC5AQAgfgEAAAABfwEAAAAFgAEBAAAABYEBAQAAAAGCAQEAAAABgwEBAAAAAYQBAQAAAAGFAQEAuAEAIYYBAQAAAAGHAQEAAAABiAEBAAAAAQt-AQAAAAF_AQAAAAWAAQEAAAAFgQEBAAAAAYIBAQAAAAGDAQEAAAABhAEBAAAAAYUBAQC5AQAhhgEBAAAAAYcBAQAAAAGIAQEAAAABDQQAAKkBACAfAACsAQAgIAAArAEAIDEAAKwBACAyAACsAQAgfggAAAABfwgAAAAEgAEIAAAABIEBCAAAAAGCAQgAAAABgwEIAAAAAYQBCAAAAAGFAQgAugEAIQ0KAADAAQAgdQAAuwEAMHYAABEAEHcAALsBADB4AQDHAQAhfUAAvwEAIYkBCAC8AQAhigEBAMcBACGLAQEA2gEAIY0BAAC9AY0BIo4BAAC-AQAgjwFAAL8BACGQAQEAxwEAIQh-CAAAAAF_CAAAAASAAQgAAAAEgQEIAAAAAYIBCAAAAAGDAQgAAAABhAEIAAAAAYUBCACsAQAhBH4AAACNAQJ_AAAAjQEIgAEAAACNAQiFAQAAtwGNASIMfoAAAAABgQGAAAAAAYIBgAAAAAGDAYAAAAABhAGAAAAAAYUBgAAAAAGRAQEAAAABkgEBAAAAAZMBAQAAAAGUAYAAAAABlQGAAAAAAZYBgAAAAAEIfkAAAAABf0AAAAAEgAFAAAAABIEBQAAAAAGCAUAAAAABgwFAAAAAAYQBQAAAAAGFAUAAqgEAIQ8HAADhAQAgCAAA4gEAIAsAAOMBACB1AADfAQAwdgAADQAQdwAA3wEAMHgBAMcBACF5AQDHAQAhegEAxwEAIX1AAL8BACGPAUAAvwEAIZgBAADgAZgBIpkBQAC_AQAhvAEAAA0AIL0BAAANACAKdQAAwQEAMHYAAHMAEHcAAMEBADB4AQClAQAheQEApQEAIXoBAKUBACF9QACnAQAhjwFAAKcBACGYAQAAwgGYASKZAUAApwEAIQcEAACpAQAgHwAAxAEAICAAAMQBACB-AAAAmAECfwAAAJgBCIABAAAAmAEIhQEAAMMBmAEiBwQAAKkBACAfAADEAQAgIAAAxAEAIH4AAACYAQJ_AAAAmAEIgAEAAACYAQiFAQAAwwGYASIEfgAAAJgBAn8AAACYAQiAAQAAAJgBCIUBAADEAZgBIgh1AADFAQAwdgAAXQAQdwAAxQEAMHgBAKUBACF9QACnAQAhjwFAAKcBACGaAQEApQEAIZsBAQClAQAhCQMAAMgBACB1AADGAQAwdgAASgAQdwAAxgEAMHgBAMcBACF9QAC_AQAhjwFAAL8BACGaAQEAxwEAIZsBAQDHAQAhC34BAAAAAX8BAAAABIABAQAAAASBAQEAAAABggEBAAAAAYMBAQAAAAGEAQEAAAABhQEBAK4BACGGAQEAAAABhwEBAAAAAYgBAQAAAAEDnAEAAAMAIJ0BAAADACCeAQAAAwAgFnUAAMkBADB2AABEABB3AADJAQAweAEApQEAIX1AAKcBACGPAUAApwEAIZ8BAQClAQAhoAEBAKUBACGhAQEAsQEAIaIBIADKAQAhowEgAMoBACGkASAAygEAIaUBQACnAQAhpgFAAKcBACGnAQEApQEAIagBAQClAQAhqQEBAKUBACGqAQEApQEAIasBCACwAQAhrAECAKYBACGtAQEApQEAIa4BAQClAQAhBQQAAKkBACAfAADMAQAgIAAAzAEAIH4gAAAAAYUBIADLAQAhBQQAAKkBACAfAADMAQAgIAAAzAEAIH4gAAAAAYUBIADLAQAhAn4gAAAAAYUBIADMAQAhD3UAAM0BADB2AAAuABB3AADNAQAweAEApQEAIX1AAKcBACGPAUAApwEAIa8BAQClAQAhsAEBAKUBACGxAQEApQEAIbIBAQClAQAhtAEAAM4BtAEitgEAAM8BtgEitwEBALEBACG4AQEAsQEAIboBAADQAboBIwcEAACpAQAgHwAA1gEAICAAANYBACB-AAAAtAECfwAAALQBCIABAAAAtAEIhQEAANUBtAEiBwQAAKkBACAfAADUAQAgIAAA1AEAIH4AAAC2AQJ_AAAAtgEIgAEAAAC2AQiFAQAA0wG2ASIHBAAAtAEAIB8AANIBACAgAADSAQAgfgAAALoBA38AAAC6AQmAAQAAALoBCYUBAADRAboBIwcEAAC0AQAgHwAA0gEAICAAANIBACB-AAAAugEDfwAAALoBCYABAAAAugEJhQEAANEBugEjBH4AAAC6AQN_AAAAugEJgAEAAAC6AQmFAQAA0gG6ASMHBAAAqQEAIB8AANQBACAgAADUAQAgfgAAALYBAn8AAAC2AQiAAQAAALYBCIUBAADTAbYBIgR-AAAAtgECfwAAALYBCIABAAAAtgEIhQEAANQBtgEiBwQAAKkBACAfAADWAQAgIAAA1gEAIH4AAAC0AQJ_AAAAtAEIgAEAAAC0AQiFAQAA1QG0ASIEfgAAALQBAn8AAAC0AQiAAQAAALQBCIUBAADWAbQBIhIDAADIAQAgCQAA3QEAIAwAANwBACB1AADXAQAwdgAAGwAQdwAA1wEAMHgBAMcBACF9QAC_AQAhjwFAAL8BACGvAQEAxwEAIbABAQDHAQAhsQEBAMcBACGyAQEAxwEAIbQBAADYAbQBIrYBAADZAbYBIrcBAQDaAQAhuAEBANoBACG6AQAA2wG6ASMEfgAAALQBAn8AAAC0AQiAAQAAALQBCIUBAADWAbQBIgR-AAAAtgECfwAAALYBCIABAAAAtgEIhQEAANQBtgEiC34BAAAAAX8BAAAABYABAQAAAAWBAQEAAAABggEBAAAAAYMBAQAAAAGEAQEAAAABhQEBALkBACGGAQEAAAABhwEBAAAAAYgBAQAAAAEEfgAAALoBA38AAAC6AQmAAQAAALoBCYUBAADSAboBIwOcAQAADQAgnQEAAA0AIJ4BAAANACADnAEAAAkAIJ0BAAAJACCeAQAACQAgAnkBAAAAAXoBAAAAAQ0HAADhAQAgCAAA4gEAIAsAAOMBACB1AADfAQAwdgAADQAQdwAA3wEAMHgBAMcBACF5AQDHAQAhegEAxwEAIX1AAL8BACGPAUAAvwEAIZgBAADgAZgBIpkBQAC_AQAhBH4AAACYAQJ_AAAAmAEIgAEAAACYAQiFAQAAxAGYASIUAwAAyAEAIAkAAN0BACAMAADcAQAgdQAA1wEAMHYAABsAEHcAANcBADB4AQDHAQAhfUAAvwEAIY8BQAC_AQAhrwEBAMcBACGwAQEAxwEAIbEBAQDHAQAhsgEBAMcBACG0AQAA2AG0ASK2AQAA2QG2ASK3AQEA2gEAIbgBAQDaAQAhugEAANsBugEjvAEAABsAIL0BAAAbACAcBQAA6QEAIAYAAOEBACAJAADdAQAgDAAA3AEAIHUAAOcBADB2AAADABB3AADnAQAweAEAxwEAIX1AAL8BACGPAUAAvwEAIZ8BAQDHAQAhoAEBAMcBACGhAQEA2gEAIaIBIADoAQAhowEgAOgBACGkASAA6AEAIaUBQAC_AQAhpgFAAL8BACGnAQEAxwEAIagBAQDHAQAhqQEBAMcBACGqAQEAxwEAIasBCAC8AQAhrAECAOYBACGtAQEAxwEAIa4BAQDHAQAhvAEAAAMAIL0BAAADACAPCgAAwAEAIHUAALsBADB2AAARABB3AAC7AQAweAEAxwEAIX1AAL8BACGJAQgAvAEAIYoBAQDHAQAhiwEBANoBACGNAQAAvQGNASKOAQAAvgEAII8BQAC_AQAhkAEBAMcBACG8AQAAEQAgvQEAABEAIAJ5AQAAAAF6AQAAAAELBwAA4QEAIAgAAOIBACB1AADlAQAwdgAACQAQdwAA5QEAMHgBAMcBACF5AQDHAQAhegEAxwEAIXsCAOYBACF8AQDHAQAhfUAAvwEAIQh-AgAAAAF_AgAAAASAAQIAAAAEgQECAAAAAYIBAgAAAAGDAQIAAAABhAECAAAAAYUBAgCpAQAhGgUAAOkBACAGAADhAQAgCQAA3QEAIAwAANwBACB1AADnAQAwdgAAAwAQdwAA5wEAMHgBAMcBACF9QAC_AQAhjwFAAL8BACGfAQEAxwEAIaABAQDHAQAhoQEBANoBACGiASAA6AEAIaMBIADoAQAhpAEgAOgBACGlAUAAvwEAIaYBQAC_AQAhpwEBAMcBACGoAQEAxwEAIakBAQDHAQAhqgEBAMcBACGrAQgAvAEAIawBAgDmAQAhrQEBAMcBACGuAQEAxwEAIQJ-IAAAAAGFASAAzAEAIQsDAADIAQAgdQAAxgEAMHYAAEoAEHcAAMYBADB4AQDHAQAhfUAAvwEAIY8BQAC_AQAhmgEBAMcBACGbAQEAxwEAIbwBAABKACC9AQAASgAgAAAAAAABxAEBAAAAAQXEAQIAAAABxwECAAAAAcgBAgAAAAHJAQIAAAABygECAAAAAQHEAUAAAAABBRkAAJcDACAaAACdAwAgvgEAAJgDACC_AQAAnAMAIMIBAAABACAFGQAAlQMAIBoAAJoDACC-AQAAlgMAIL8BAACZAwAgwgEAAAUAIAMZAACXAwAgvgEAAJgDACDCAQAAAQAgAxkAAJUDACC-AQAAlgMAIMIBAAAFACAAAAAAAAAFxAEIAAAAAccBCAAAAAHIAQgAAAAByQEIAAAAAcoBCAAAAAEBxAEBAAAAAQHEAQAAAI0BAgUZAACQAwAgGgAAkwMAIL4BAACRAwAgvwEAAJIDACDCAQAADwAgAxkAAJADACC-AQAAkQMAIMIBAAAPACADBwAA8gIAIAgAAPMCACALAAD0AgAgAAAAAcQBAAAAmAECBRkAAIgDACAaAACOAwAgvgEAAIkDACC_AQAAjQMAIMIBAAABACAFGQAAhgMAIBoAAIsDACC-AQAAhwMAIL8BAACKAwAgwgEAAAUAIAcZAACJAgAgGgAAjAIAIL4BAACKAgAgvwEAAIsCACDAAQAAEQAgwQEAABEAIMIBAAB2ACAIeAEAAAABfUAAAAABiQEIAAAAAYoBAQAAAAGLAQEAAAABjQEAAACNAQKOAYAAAAABjwFAAAAAAQIAAAB2ACAZAACJAgAgAwAAABEAIBkAAIkCACAaAACNAgAgCgAAABEAIBIAAI0CACB4AQDvAQAhfUAA8QEAIYkBCAD8AQAhigEBAO8BACGLAQEA_QEAIY0BAAD-AY0BIo4BgAAAAAGPAUAA8QEAIQh4AQDvAQAhfUAA8QEAIYkBCAD8AQAhigEBAO8BACGLAQEA_QEAIY0BAAD-AY0BIo4BgAAAAAGPAUAA8QEAIQMZAACIAwAgvgEAAIkDACDCAQAAAQAgAxkAAIYDACC-AQAAhwMAIMIBAAAFACADGQAAiQIAIL4BAACKAgAgwgEAAHYAIAAAAAsZAACVAgAwGgAAmgIAML4BAACWAgAwvwEAAJcCADDAAQAAmQIAMMEBAACZAgAwwgEAAJkCADDDAQAAmAIAIMQBAACZAgAwxQEAAJsCADDGAQAAnAIAMBUGAAC9AgAgCQAAvgIAIAwAAL8CACB4AQAAAAF9QAAAAAGPAUAAAAABnwEBAAAAAaABAQAAAAGhAQEAAAABogEgAAAAAaMBIAAAAAGkASAAAAABpQFAAAAAAaYBQAAAAAGnAQEAAAABqAEBAAAAAakBAQAAAAGqAQEAAAABqwEIAAAAAawBAgAAAAGuAQEAAAABAgAAAAUAIBkAALwCACADAAAABQAgGQAAvAIAIBoAAKACACABEgAAhQMAMBoFAADpAQAgBgAA4QEAIAkAAN0BACAMAADcAQAgdQAA5wEAMHYAAAMAEHcAAOcBADB4AQAAAAF9QAC_AQAhjwFAAL8BACGfAQEAxwEAIaABAQDHAQAhoQEBANoBACGiASAA6AEAIaMBIADoAQAhpAEgAOgBACGlAUAAvwEAIaYBQAC_AQAhpwEBAMcBACGoAQEAxwEAIakBAQDHAQAhqgEBAMcBACGrAQgAvAEAIawBAgDmAQAhrQEBAMcBACGuAQEAxwEAIQIAAAAFACASAACgAgAgAgAAAJ0CACASAACeAgAgFnUAAJwCADB2AACdAgAQdwAAnAIAMHgBAMcBACF9QAC_AQAhjwFAAL8BACGfAQEAxwEAIaABAQDHAQAhoQEBANoBACGiASAA6AEAIaMBIADoAQAhpAEgAOgBACGlAUAAvwEAIaYBQAC_AQAhpwEBAMcBACGoAQEAxwEAIakBAQDHAQAhqgEBAMcBACGrAQgAvAEAIawBAgDmAQAhrQEBAMcBACGuAQEAxwEAIRZ1AACcAgAwdgAAnQIAEHcAAJwCADB4AQDHAQAhfUAAvwEAIY8BQAC_AQAhnwEBAMcBACGgAQEAxwEAIaEBAQDaAQAhogEgAOgBACGjASAA6AEAIaQBIADoAQAhpQFAAL8BACGmAUAAvwEAIacBAQDHAQAhqAEBAMcBACGpAQEAxwEAIaoBAQDHAQAhqwEIALwBACGsAQIA5gEAIa0BAQDHAQAhrgEBAMcBACESeAEA7wEAIX1AAPEBACGPAUAA8QEAIZ8BAQDvAQAhoAEBAO8BACGhAQEA_QEAIaIBIACfAgAhowEgAJ8CACGkASAAnwIAIaUBQADxAQAhpgFAAPEBACGnAQEA7wEAIagBAQDvAQAhqQEBAO8BACGqAQEA7wEAIasBCAD8AQAhrAECAPABACGuAQEA7wEAIQHEASAAAAABFQYAAKECACAJAACiAgAgDAAAowIAIHgBAO8BACF9QADxAQAhjwFAAPEBACGfAQEA7wEAIaABAQDvAQAhoQEBAP0BACGiASAAnwIAIaMBIACfAgAhpAEgAJ8CACGlAUAA8QEAIaYBQADxAQAhpwEBAO8BACGoAQEA7wEAIakBAQDvAQAhqgEBAO8BACGrAQgA_AEAIawBAgDwAQAhrgEBAO8BACEFGQAA_gIAIBoAAIMDACC-AQAA_wIAIL8BAACCAwAgwgEAAAEAIAsZAACwAgAwGgAAtQIAML4BAACxAgAwvwEAALICADDAAQAAtAIAMMEBAAC0AgAwwgEAALQCADDDAQAAswIAIMQBAAC0AgAwxQEAALYCADDGAQAAtwIAMAsZAACkAgAwGgAAqQIAML4BAAClAgAwvwEAAKYCADDAAQAAqAIAMMEBAACoAgAwwgEAAKgCADDDAQAApwIAIMQBAACoAgAwxQEAAKoCADDGAQAAqwIAMAgHAACOAgAgCwAAkAIAIHgBAAAAAXkBAAAAAX1AAAAAAY8BQAAAAAGYAQAAAJgBApkBQAAAAAECAAAADwAgGQAArwIAIAMAAAAPACAZAACvAgAgGgAArgIAIAESAACBAwAwDgcAAOEBACAIAADiAQAgCwAA4wEAIHUAAN8BADB2AAANABB3AADfAQAweAEAAAABeQEAxwEAIXoBAMcBACF9QAC_AQAhjwFAAL8BACGYAQAA4AGYASKZAUAAvwEAIbsBAADeAQAgAgAAAA8AIBIAAK4CACACAAAArAIAIBIAAK0CACAKdQAAqwIAMHYAAKwCABB3AACrAgAweAEAxwEAIXkBAMcBACF6AQDHAQAhfUAAvwEAIY8BQAC_AQAhmAEAAOABmAEimQFAAL8BACEKdQAAqwIAMHYAAKwCABB3AACrAgAweAEAxwEAIXkBAMcBACF6AQDHAQAhfUAAvwEAIY8BQAC_AQAhmAEAAOABmAEimQFAAL8BACEGeAEA7wEAIXkBAO8BACF9QADxAQAhjwFAAPEBACGYAQAAhQKYASKZAUAA8QEAIQgHAACGAgAgCwAAiAIAIHgBAO8BACF5AQDvAQAhfUAA8QEAIY8BQADxAQAhmAEAAIUCmAEimQFAAPEBACEIBwAAjgIAIAsAAJACACB4AQAAAAF5AQAAAAF9QAAAAAGPAUAAAAABmAEAAACYAQKZAUAAAAABBgcAAPQBACB4AQAAAAF5AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAECAAAACwAgGQAAuwIAIAMAAAALACAZAAC7AgAgGgAAugIAIAESAACAAwAwDAcAAOEBACAIAADiAQAgdQAA5QEAMHYAAAkAEHcAAOUBADB4AQAAAAF5AQDHAQAhegEAxwEAIXsCAOYBACF8AQDHAQAhfUAAvwEAIbsBAADkAQAgAgAAAAsAIBIAALoCACACAAAAuAIAIBIAALkCACAJdQAAtwIAMHYAALgCABB3AAC3AgAweAEAxwEAIXkBAMcBACF6AQDHAQAhewIA5gEAIXwBAMcBACF9QAC_AQAhCXUAALcCADB2AAC4AgAQdwAAtwIAMHgBAMcBACF5AQDHAQAhegEAxwEAIXsCAOYBACF8AQDHAQAhfUAAvwEAIQV4AQDvAQAheQEA7wEAIXsCAPABACF8AQDvAQAhfUAA8QEAIQYHAADyAQAgeAEA7wEAIXkBAO8BACF7AgDwAQAhfAEA7wEAIX1AAPEBACEGBwAA9AEAIHgBAAAAAXkBAAAAAXsCAAAAAXwBAAAAAX1AAAAAARUGAAC9AgAgCQAAvgIAIAwAAL8CACB4AQAAAAF9QAAAAAGPAUAAAAABnwEBAAAAAaABAQAAAAGhAQEAAAABogEgAAAAAaMBIAAAAAGkASAAAAABpQFAAAAAAaYBQAAAAAGnAQEAAAABqAEBAAAAAakBAQAAAAGqAQEAAAABqwEIAAAAAawBAgAAAAGuAQEAAAABAxkAAP4CACC-AQAA_wIAIMIBAAABACAEGQAAsAIAML4BAACxAgAwwgEAALQCADDDAQAAswIAIAQZAACkAgAwvgEAAKUCADDCAQAAqAIAMMMBAACnAgAgBBkAAJUCADC-AQAAlgIAMMIBAACZAgAwwwEAAJgCACAAAAAAAAAFGQAA-QIAIBoAAPwCACC-AQAA-gIAIL8BAAD7AgAgwgEAAEcAIAMZAAD5AgAgvgEAAPoCACDCAQAARwAgAAAAAcQBAAAAtAECAcQBAAAAtgECAcQBAAAAugEDCxkAAOQCADAaAADoAgAwvgEAAOUCADC_AQAA5gIAMMABAACZAgAwwQEAAJkCADDCAQAAmQIAMMMBAADnAgAgxAEAAJkCADDFAQAA6QIAMMYBAACcAgAwCxkAANsCADAaAADfAgAwvgEAANwCADC_AQAA3QIAMMABAACoAgAwwQEAAKgCADDCAQAAqAIAMMMBAADeAgAgxAEAAKgCADDFAQAA4AIAMMYBAACrAgAwCxkAANICADAaAADWAgAwvgEAANMCADC_AQAA1AIAMMABAAC0AgAwwQEAALQCADDCAQAAtAIAMMMBAADVAgAgxAEAALQCADDFAQAA1wIAMMYBAAC3AgAwBggAAPUBACB4AQAAAAF6AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAECAAAACwAgGQAA2gIAIAMAAAALACAZAADaAgAgGgAA2QIAIAESAAD4AgAwAgAAAAsAIBIAANkCACACAAAAuAIAIBIAANgCACAFeAEA7wEAIXoBAO8BACF7AgDwAQAhfAEA7wEAIX1AAPEBACEGCAAA8wEAIHgBAO8BACF6AQDvAQAhewIA8AEAIXwBAO8BACF9QADxAQAhBggAAPUBACB4AQAAAAF6AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAEICAAAjwIAIAsAAJACACB4AQAAAAF6AQAAAAF9QAAAAAGPAUAAAAABmAEAAACYAQKZAUAAAAABAgAAAA8AIBkAAOMCACADAAAADwAgGQAA4wIAIBoAAOICACABEgAA9wIAMAIAAAAPACASAADiAgAgAgAAAKwCACASAADhAgAgBngBAO8BACF6AQDvAQAhfUAA8QEAIY8BQADxAQAhmAEAAIUCmAEimQFAAPEBACEICAAAhwIAIAsAAIgCACB4AQDvAQAhegEA7wEAIX1AAPEBACGPAUAA8QEAIZgBAACFApgBIpkBQADxAQAhCAgAAI8CACALAACQAgAgeAEAAAABegEAAAABfUAAAAABjwFAAAAAAZgBAAAAmAECmQFAAAAAARUFAADIAgAgCQAAvgIAIAwAAL8CACB4AQAAAAF9QAAAAAGPAUAAAAABnwEBAAAAAaABAQAAAAGhAQEAAAABogEgAAAAAaMBIAAAAAGkASAAAAABpQFAAAAAAaYBQAAAAAGnAQEAAAABqAEBAAAAAakBAQAAAAGqAQEAAAABqwEIAAAAAawBAgAAAAGtAQEAAAABAgAAAAUAIBkAAOwCACADAAAABQAgGQAA7AIAIBoAAOsCACABEgAA9gIAMAIAAAAFACASAADrAgAgAgAAAJ0CACASAADqAgAgEngBAO8BACF9QADxAQAhjwFAAPEBACGfAQEA7wEAIaABAQDvAQAhoQEBAP0BACGiASAAnwIAIaMBIACfAgAhpAEgAJ8CACGlAUAA8QEAIaYBQADxAQAhpwEBAO8BACGoAQEA7wEAIakBAQDvAQAhqgEBAO8BACGrAQgA_AEAIawBAgDwAQAhrQEBAO8BACEVBQAAxwIAIAkAAKICACAMAACjAgAgeAEA7wEAIX1AAPEBACGPAUAA8QEAIZ8BAQDvAQAhoAEBAO8BACGhAQEA_QEAIaIBIACfAgAhowEgAJ8CACGkASAAnwIAIaUBQADxAQAhpgFAAPEBACGnAQEA7wEAIagBAQDvAQAhqQEBAO8BACGqAQEA7wEAIasBCAD8AQAhrAECAPABACGtAQEA7wEAIRUFAADIAgAgCQAAvgIAIAwAAL8CACB4AQAAAAF9QAAAAAGPAUAAAAABnwEBAAAAAaABAQAAAAGhAQEAAAABogEgAAAAAaMBIAAAAAGkASAAAAABpQFAAAAAAaYBQAAAAAGnAQEAAAABqAEBAAAAAakBAQAAAAGqAQEAAAABqwEIAAAAAawBAgAAAAGtAQEAAAABBBkAAOQCADC-AQAA5QIAMMIBAACZAgAwwwEAAOcCACAEGQAA2wIAML4BAADcAgAwwgEAAKgCADDDAQAA3gIAIAQZAADSAgAwvgEAANMCADDCAQAAtAIAMMMBAADVAgAgAAAGAwAAwQIAIAkAAPECACAMAADwAgAgtwEAAPYBACC4AQAA9gEAILoBAAD2AQAgBQUAAPUCACAGAADyAgAgCQAA8QIAIAwAAPACACChAQAA9gEAIAMKAACBAgAgiwEAAPYBACCOAQAA9gEAIAEDAADBAgAgEngBAAAAAX1AAAAAAY8BQAAAAAGfAQEAAAABoAEBAAAAAaEBAQAAAAGiASAAAAABowEgAAAAAaQBIAAAAAGlAUAAAAABpgFAAAAAAacBAQAAAAGoAQEAAAABqQEBAAAAAaoBAQAAAAGrAQgAAAABrAECAAAAAa0BAQAAAAEGeAEAAAABegEAAAABfUAAAAABjwFAAAAAAZgBAAAAmAECmQFAAAAAAQV4AQAAAAF6AQAAAAF7AgAAAAF8AQAAAAF9QAAAAAEFeAEAAAABfUAAAAABjwFAAAAAAZoBAQAAAAGbAQEAAAABAgAAAEcAIBkAAPkCACADAAAASgAgGQAA-QIAIBoAAP0CACAHAAAASgAgEgAA_QIAIHgBAO8BACF9QADxAQAhjwFAAPEBACGaAQEA7wEAIZsBAQDvAQAhBXgBAO8BACF9QADxAQAhjwFAAPEBACGaAQEA7wEAIZsBAQDvAQAhDgkAAO8CACAMAADuAgAgeAEAAAABfUAAAAABjwFAAAAAAa8BAQAAAAGwAQEAAAABsQEBAAAAAbIBAQAAAAG0AQAAALQBArYBAAAAtgECtwEBAAAAAbgBAQAAAAG6AQAAALoBAwIAAAABACAZAAD-AgAgBXgBAAAAAXkBAAAAAXsCAAAAAXwBAAAAAX1AAAAAAQZ4AQAAAAF5AQAAAAF9QAAAAAGPAUAAAAABmAEAAACYAQKZAUAAAAABAwAAABsAIBkAAP4CACAaAACEAwAgEAAAABsAIAkAANECACAMAADQAgAgEgAAhAMAIHgBAO8BACF9QADxAQAhjwFAAPEBACGvAQEA7wEAIbABAQDvAQAhsQEBAO8BACGyAQEA7wEAIbQBAADMArQBIrYBAADNArYBIrcBAQD9AQAhuAEBAP0BACG6AQAAzgK6ASMOCQAA0QIAIAwAANACACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhrwEBAO8BACGwAQEA7wEAIbEBAQDvAQAhsgEBAO8BACG0AQAAzAK0ASK2AQAAzQK2ASK3AQEA_QEAIbgBAQD9AQAhugEAAM4CugEjEngBAAAAAX1AAAAAAY8BQAAAAAGfAQEAAAABoAEBAAAAAaEBAQAAAAGiASAAAAABowEgAAAAAaQBIAAAAAGlAUAAAAABpgFAAAAAAacBAQAAAAGoAQEAAAABqQEBAAAAAaoBAQAAAAGrAQgAAAABrAECAAAAAa4BAQAAAAEWBQAAyAIAIAYAAL0CACAJAAC-AgAgeAEAAAABfUAAAAABjwFAAAAAAZ8BAQAAAAGgAQEAAAABoQEBAAAAAaIBIAAAAAGjASAAAAABpAEgAAAAAaUBQAAAAAGmAUAAAAABpwEBAAAAAagBAQAAAAGpAQEAAAABqgEBAAAAAasBCAAAAAGsAQIAAAABrQEBAAAAAa4BAQAAAAECAAAABQAgGQAAhgMAIA4DAADtAgAgCQAA7wIAIHgBAAAAAX1AAAAAAY8BQAAAAAGvAQEAAAABsAEBAAAAAbEBAQAAAAGyAQEAAAABtAEAAAC0AQK2AQAAALYBArcBAQAAAAG4AQEAAAABugEAAAC6AQMCAAAAAQAgGQAAiAMAIAMAAAADACAZAACGAwAgGgAAjAMAIBgAAAADACAFAADHAgAgBgAAoQIAIAkAAKICACASAACMAwAgeAEA7wEAIX1AAPEBACGPAUAA8QEAIZ8BAQDvAQAhoAEBAO8BACGhAQEA_QEAIaIBIACfAgAhowEgAJ8CACGkASAAnwIAIaUBQADxAQAhpgFAAPEBACGnAQEA7wEAIagBAQDvAQAhqQEBAO8BACGqAQEA7wEAIasBCAD8AQAhrAECAPABACGtAQEA7wEAIa4BAQDvAQAhFgUAAMcCACAGAAChAgAgCQAAogIAIHgBAO8BACF9QADxAQAhjwFAAPEBACGfAQEA7wEAIaABAQDvAQAhoQEBAP0BACGiASAAnwIAIaMBIACfAgAhpAEgAJ8CACGlAUAA8QEAIaYBQADxAQAhpwEBAO8BACGoAQEA7wEAIakBAQDvAQAhqgEBAO8BACGrAQgA_AEAIawBAgDwAQAhrQEBAO8BACGuAQEA7wEAIQMAAAAbACAZAACIAwAgGgAAjwMAIBAAAAAbACADAADPAgAgCQAA0QIAIBIAAI8DACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhrwEBAO8BACGwAQEA7wEAIbEBAQDvAQAhsgEBAO8BACG0AQAAzAK0ASK2AQAAzQK2ASK3AQEA_QEAIbgBAQD9AQAhugEAAM4CugEjDgMAAM8CACAJAADRAgAgeAEA7wEAIX1AAPEBACGPAUAA8QEAIa8BAQDvAQAhsAEBAO8BACGxAQEA7wEAIbIBAQDvAQAhtAEAAMwCtAEitgEAAM0CtgEitwEBAP0BACG4AQEA_QEAIboBAADOAroBIwkHAACOAgAgCAAAjwIAIHgBAAAAAXkBAAAAAXoBAAAAAX1AAAAAAY8BQAAAAAGYAQAAAJgBApkBQAAAAAECAAAADwAgGQAAkAMAIAMAAAANACAZAACQAwAgGgAAlAMAIAsAAAANACAHAACGAgAgCAAAhwIAIBIAAJQDACB4AQDvAQAheQEA7wEAIXoBAO8BACF9QADxAQAhjwFAAPEBACGYAQAAhQKYASKZAUAA8QEAIQkHAACGAgAgCAAAhwIAIHgBAO8BACF5AQDvAQAhegEA7wEAIX1AAPEBACGPAUAA8QEAIZgBAACFApgBIpkBQADxAQAhFgUAAMgCACAGAAC9AgAgDAAAvwIAIHgBAAAAAX1AAAAAAY8BQAAAAAGfAQEAAAABoAEBAAAAAaEBAQAAAAGiASAAAAABowEgAAAAAaQBIAAAAAGlAUAAAAABpgFAAAAAAacBAQAAAAGoAQEAAAABqQEBAAAAAaoBAQAAAAGrAQgAAAABrAECAAAAAa0BAQAAAAGuAQEAAAABAgAAAAUAIBkAAJUDACAOAwAA7QIAIAwAAO4CACB4AQAAAAF9QAAAAAGPAUAAAAABrwEBAAAAAbABAQAAAAGxAQEAAAABsgEBAAAAAbQBAAAAtAECtgEAAAC2AQK3AQEAAAABuAEBAAAAAboBAAAAugEDAgAAAAEAIBkAAJcDACADAAAAAwAgGQAAlQMAIBoAAJsDACAYAAAAAwAgBQAAxwIAIAYAAKECACAMAACjAgAgEgAAmwMAIHgBAO8BACF9QADxAQAhjwFAAPEBACGfAQEA7wEAIaABAQDvAQAhoQEBAP0BACGiASAAnwIAIaMBIACfAgAhpAEgAJ8CACGlAUAA8QEAIaYBQADxAQAhpwEBAO8BACGoAQEA7wEAIakBAQDvAQAhqgEBAO8BACGrAQgA_AEAIawBAgDwAQAhrQEBAO8BACGuAQEA7wEAIRYFAADHAgAgBgAAoQIAIAwAAKMCACB4AQDvAQAhfUAA8QEAIY8BQADxAQAhnwEBAO8BACGgAQEA7wEAIaEBAQD9AQAhogEgAJ8CACGjASAAnwIAIaQBIACfAgAhpQFAAPEBACGmAUAA8QEAIacBAQDvAQAhqAEBAO8BACGpAQEA7wEAIaoBAQDvAQAhqwEIAPwBACGsAQIA8AEAIa0BAQDvAQAhrgEBAO8BACEDAAAAGwAgGQAAlwMAIBoAAJ4DACAQAAAAGwAgAwAAzwIAIAwAANACACASAACeAwAgeAEA7wEAIX1AAPEBACGPAUAA8QEAIa8BAQDvAQAhsAEBAO8BACGxAQEA7wEAIbIBAQDvAQAhtAEAAMwCtAEitgEAAM0CtgEitwEBAP0BACG4AQEA_QEAIboBAADOAroBIw4DAADPAgAgDAAA0AIAIHgBAO8BACF9QADxAQAhjwFAAPEBACGvAQEA7wEAIbABAQDvAQAhsQEBAO8BACGyAQEA7wEAIbQBAADMArQBIrYBAADNArYBIrcBAQD9AQAhuAEBAP0BACG6AQAAzgK6ASMEAwYCBAAJCRYFDBUGBQQACAUAAwYAAQkMBQwQBgIDBwIEAAQBAwgAAgcAAQgAAgMHAAEIAAILEgcBCgAGAgkTAAwUAAMDFwAJGQAMGAAAAAADBAAOHwAPIAAQAAAAAwQADh8ADyAAEAIFAAMGAAECBQADBgABBQQAFR8AGCAAGTEAFjIAFwAAAAAABQQAFR8AGCAAGTEAFjIAFwAAAwQAHh8AHyAAIAAAAAMEAB4fAB8gACACBwABCAACAgcAAQgAAgMEACUfACYgACcAAAADBAAlHwAmIAAnAQoABgEKAAYFBAAsHwAvIAAwMQAtMgAuAAAAAAAFBAAsHwAvIAAwMQAtMgAuAgcAAQgAAgIHAAEIAAIFBAA1HwA4IAA5MQA2MgA3AAAAAAAFBAA1HwA4IAA5MQA2MgA3DQIBDhoBDx0BEB4BER8BEyEBFCMKFSQLFiYBFygKGCkMGyoBHCsBHSwKIS8NIjARIzECJDICJTMCJjQCJzUCKDcCKTkKKjoSKzwCLD4KLT8TLkACL0ECMEIKM0UUNEYaNUgDNkkDN0wDOE0DOU4DOlADO1IKPFMbPVUDPlcKP1gcQFkDQVoDQlsKQ14dRF8hRWAGRmEGR2IGSGMGSWQGSmYGS2gKTGkiTWsGTm0KT24jUG8GUXAGUnEKU3QkVHUoVXcHVngHV3oHWHsHWXwHWn4HW4ABClyBASldgwEHXoUBCl-GASpghwEHYYgBB2KJAQpjjAErZI0BMWWOAQVmjwEFZ5ABBWiRAQVpkgEFapQBBWuWAQpslwEybZkBBW6bAQpvnAEzcJ0BBXGeAQVynwEKc6IBNHSjATo"
+};
+async function decodeBase64AsWasm(wasmBase64) {
+  const { Buffer } = await import("buffer");
+  const wasmArray = Buffer.from(wasmBase64, "base64");
+  return new WebAssembly.Module(wasmArray);
+}
+config.compilerWasm = {
+  getRuntime: async () => await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.mjs"),
+  getQueryCompilerWasmModule: async () => {
+    const { wasm } = await import("@prisma/client/runtime/query_compiler_fast_bg.postgresql.wasm-base64.mjs");
+    return await decodeBase64AsWasm(wasm);
+  },
+  importName: "./query_compiler_fast_bg.js"
+};
+function getPrismaClientClass() {
+  return runtime.getPrismaClient(config);
+}
+
+// src/generated/prisma/internal/prismaNamespace.ts
+import * as runtime2 from "@prisma/client/runtime/client";
+var getExtensionContext = runtime2.Extensions.getExtensionContext;
+var NullTypes2 = {
+  DbNull: runtime2.NullTypes.DbNull,
+  JsonNull: runtime2.NullTypes.JsonNull,
+  AnyNull: runtime2.NullTypes.AnyNull
+};
+var TransactionIsolationLevel = runtime2.makeStrictEnum({
+  ReadUncommitted: "ReadUncommitted",
+  ReadCommitted: "ReadCommitted",
+  RepeatableRead: "RepeatableRead",
+  Serializable: "Serializable"
+});
+var defineExtension = runtime2.Extensions.defineExtension;
+
+// src/generated/prisma/client.ts
+globalThis["__dirname"] = path.dirname(fileURLToPath(import.meta.url));
+var PrismaClient = getPrismaClientClass();
+
+// src/app/module/event/event.constants.ts
+var EventSearchableFields = [
+  "title",
+  "description",
+  "country",
+  "city",
+  "address",
+  "postalCode"
+];
+var EVENT_STATUS = {
+  UPCOMING: "UPCOMING",
+  ONGOING: "ONGOING",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED"
+};
+
+// src/app/lib/prisma.ts
+var connectionString = `${process.env.DATABASE_URL}`;
+var adapter = new PrismaPg({ connectionString });
+var basePrisma = new PrismaClient({ adapter });
+var prisma = basePrisma.$extends({
+  result: {
+    event: {
+      eventStatus: {
+        needs: { startTime: true, endTime: true, isCancelled: true },
+        compute(event) {
+          if (event.isCancelled) return EVENT_STATUS.CANCELLED;
+          const now = /* @__PURE__ */ new Date();
+          if (now < event.startTime) return EVENT_STATUS.UPCOMING;
+          if (now >= event.endTime) return EVENT_STATUS.COMPLETED;
+          return EVENT_STATUS.ONGOING;
+        }
+      }
+    }
+  }
+});
+
+// src/app/module/user/user.service.ts
+import status5 from "http-status";
+var changeRole = async (id, role, currentUser) => {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: {
+      id
+    }
+  });
+  if (currentUser.id === user.id) {
+    throw new AppError_default(status5.FORBIDDEN, "You cannot change your own role");
+  }
+  const result = await prisma.user.update({
+    where: {
+      id: user.id
+    },
+    data: {
+      role
+    }
+  });
+  const { password: userPassword, ...safeUser } = result;
+  return safeUser;
+};
+var getAllUsers = async (role) => {
+  const where = {};
+  if (role && Object.values(UserRole).includes(role)) {
+    where.role = role;
+  }
+  const users = await prisma.user.findMany({
+    where,
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+  return users.map((user) => {
+    const { password: userPassword, ...safeUser } = user;
+    return safeUser;
+  });
+};
+var getUserById = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id
+    },
+    include: {
+      eventParticipations: {
+        include: {
+          event: {
+            include: {
+              category: true
+            }
+          }
+        }
+      },
+      events: true
+    }
+  });
+  if (!user) {
+    throw new AppError_default(status5.NOT_FOUND, "User not found");
+  }
+  const { password: userPassword, ...safeUser } = user;
+  return safeUser;
+};
+var updateProfile = async (id, payload) => {
+  const user = await prisma.user.update({
+    where: {
+      id
+    },
+    data: payload
+  });
+  if (!user) {
+    throw new AppError_default(status5.NOT_FOUND, "User not found");
+  }
+  const { password: userPassword, ...safeUser } = user;
+  return safeUser;
+};
+var updateStatus = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id
+    }
+  });
+  if (!user) {
+    throw new AppError_default(status5.NOT_FOUND, "User not found");
+  }
+  if (user.role === UserRole.ADMIN) {
+    throw new AppError_default(status5.FORBIDDEN, "Admin cannot be banned");
+  }
+  const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.BANNED : UserStatus.ACTIVE;
+  const result = await prisma.user.update({
+    where: {
+      id
+    },
+    data: {
+      status: newStatus
+    }
+  });
+  const { password: userPassword, ...safeUser } = result;
+  return safeUser;
+};
+var getMyProfile = async (id) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id
+    },
+    include: {
+      eventParticipations: true,
+      events: true
+    }
+  });
+  if (!user) {
+    throw new AppError_default(status5.NOT_FOUND, "User not found");
+  }
+  const { password: userPassword, ...safeUser } = user;
+  return safeUser;
+};
+var UserService = {
+  changeRole,
+  getAllUsers,
+  getUserById,
+  updateProfile,
+  updateStatus,
+  getMyProfile
+};
+
+// src/app/module/user/user.controller.ts
+var changeRole2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status6.UNAUTHORIZED, "Unauthorized");
+  }
+  const currentUser = req.user;
+  const result = await UserService.changeRole(
+    req.params.id,
+    req.body.role,
+    currentUser
+  );
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: "Role changed successfully",
+    data: result
+  });
+});
+var updateStatus2 = catchAsync(async (req, res) => {
+  const result = await UserService.updateStatus(req.params.id);
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: `User ${result.status === UserStatus.BANNED ? "banned" : "unbanned"} successfully`,
+    data: result
+  });
+});
+var getAllUsers2 = catchAsync(async (req, res) => {
+  const result = await UserService.getAllUsers(req.query.role);
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: "Users fetched successfully",
+    data: result
+  });
+});
+var getUserById2 = catchAsync(async (req, res) => {
+  const result = await UserService.getUserById(req.params.id);
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: "User fetched successfully",
+    data: result
+  });
+});
+var updateProfile2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status6.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await UserService.updateProfile(
+    req.user.id,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: "Profile updated successfully",
+    data: result
+  });
+});
+var getMyProfile2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status6.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await UserService.getMyProfile(req.user.id);
+  sendResponse(res, {
+    statusCode: status6.OK,
+    success: true,
+    message: "Profile fetched successfully",
+    data: result
+  });
+});
+var UserController = {
+  changeRole: changeRole2,
+  updateStatus: updateStatus2,
+  getAllUsers: getAllUsers2,
+  getUserById: getUserById2,
+  updateProfile: updateProfile2,
+  getMyProfile: getMyProfile2
+};
+
+// src/app/middleware/auth.ts
+import httpStatus from "http-status";
+
+// src/app/utils/jwt.ts
+import jwt from "jsonwebtoken";
+var createToken = (payload, secret, { expiresIn }) => {
+  const token = jwt.sign(payload, secret, { expiresIn });
+  return token;
+};
+var verifyToken = (token, secret) => {
+  try {
+    const decoded = jwt.verify(token, secret);
+    return {
+      success: true,
+      data: decoded
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message,
+      error
+    };
+  }
+};
+var decodeToken = (token) => {
+  const decoded = jwt.decode(token);
+  return decoded;
+};
+var jwtUtils = {
+  createToken,
+  verifyToken,
+  decodeToken
+};
+var jwt_default = jwtUtils;
+
+// src/app/middleware/auth.ts
+var auth = (...requiredRoles) => {
+  return catchAsync(async (req, res, next) => {
+    const token = req.headers.authorization;
+    if (!token) {
+      throw new AppError_default(httpStatus.UNAUTHORIZED, "You are not authorized!");
+    }
+    const verifiedUser = jwt_default.verifyToken(
+      token,
+      env_default.ACCESS_TOKEN_SECRET
+    );
+    if (!verifiedUser.success || !verifiedUser.data) {
+      throw new AppError_default(httpStatus.UNAUTHORIZED, "Invalid Token");
+    }
+    const { role } = verifiedUser.data;
+    if (requiredRoles.length && !requiredRoles.includes(role)) {
+      throw new AppError_default(httpStatus.FORBIDDEN, "Forbidden access");
+    }
+    req.user = verifiedUser.data;
+    next();
+  });
+};
+var auth_default = auth;
+
+// src/app/middleware/validateRequest.ts
+function validateRequest(zodSchema) {
+  return (req, res, next) => {
+    if (req.body.data) {
+      req.body = JSON.parse(req.body.data);
+    }
+    const result = zodSchema.safeParse({
+      body: req.body,
+      query: req.query,
+      params: req.params
+    });
+    if (!result.success) {
+      next(result.error);
+    } else {
+      const data = result.data;
+      if (data.body) req.body = data.body;
+      if (data.query) req.query = data.query;
+      if (data.params) req.params = data.params;
+      next();
+    }
+  };
+}
+
+// src/app/module/user/user.validation.ts
+import { z as z2 } from "zod";
+var updateProfileValidation = z2.object({
+  body: z2.object({
+    firstName: z2.string().optional(),
+    lastName: z2.string().optional(),
+    phone: z2.string().optional(),
+    gender: z2.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+    profilePhoto: z2.string().optional()
+  })
+});
+var UserValidation = {
+  updateProfileValidation
+};
+
+// src/app/module/user/user.route.ts
+var router = Router();
+router.put("/update-role/:id", auth_default(UserRole.ADMIN), UserController.changeRole);
+router.put(
+  "/update-profile",
+  auth_default(UserRole.USER, UserRole.ADMIN),
+  validateRequest(UserValidation.updateProfileValidation),
+  UserController.updateProfile
+);
+router.get(
+  "/",
+  auth_default(UserRole.ADMIN, UserRole.USER),
+  UserController.getAllUsers
+);
+router.put(
+  "/update-status/:id",
+  auth_default(UserRole.ADMIN),
+  UserController.updateStatus
+);
+router.get(
+  "/my-profile",
+  auth_default(UserRole.ADMIN, UserRole.USER),
+  UserController.getMyProfile
+);
+router.get(
+  "/:id",
+  auth_default(UserRole.ADMIN, UserRole.USER),
+  UserController.getUserById
+);
+var UserRoutes = router;
+
+// src/app/module/auth/auth.route.ts
+import { Router as Router2 } from "express";
+
+// src/app/module/auth/auth.controller.ts
+import status8 from "http-status";
+
+// src/app/utils/cookie.ts
+var getCookie = (req, key) => {
+  return req.cookies[key];
+};
+var setCookie = (res, key, value, options) => {
+  res.cookie(key, value, options);
+};
+var clearCookie = (res, key, options) => {
+  res.clearCookie(key, options);
+};
+var setAccessTokenCookie = (res, token) => {
+  const options = {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 24 * 60 * 60 * 1e3,
+    path: "/"
+  };
+  setCookie(res, "accessToken", token, options);
+};
+var setRefreshTokenCookie = (res, token) => {
+  const options = {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 7 * 24 * 60 * 60 * 1e3,
+    path: "/"
+  };
+  setCookie(res, "refreshToken", token, options);
+};
+var cookieUtils = {
+  getCookie,
+  setCookie,
+  clearCookie,
+  setAccessTokenCookie,
+  setRefreshTokenCookie
+};
+var cookie_default = cookieUtils;
+
+// src/app/module/auth/auth.service.ts
+import status7 from "http-status";
+import bcrypt from "bcrypt";
+
+// src/app/utils/token.ts
+var getAccessToken = (payload) => {
+  const accessToken = jwt_default.createToken(
+    payload,
+    env_default.ACCESS_TOKEN_SECRET,
+    {
+      expiresIn: env_default.ACCESS_TOKEN_EXPIRES_IN
+    }
+  );
+  return accessToken;
+};
+var getRefreshToken = (payload) => {
+  const refreshToken = jwt_default.createToken(
+    payload,
+    env_default.REFRESH_TOKEN_SECRET,
+    {
+      expiresIn: env_default.REFRESH_TOKEN_EXPIRES_IN
+    }
+  );
+  return refreshToken;
+};
+var tokenUtils = {
+  getAccessToken,
+  getRefreshToken
+};
+var token_default = tokenUtils;
+
+// src/app/module/auth/auth.service.ts
+var registerUser = async (payload) => {
+  const { email, password, ...otherData } = payload;
+  const isUserExist = await prisma.user.findUnique({
+    where: {
+      email
+    }
+  });
+  if (isUserExist) {
+    throw new AppError_default(status7.CONFLICT, "User already exists");
+  }
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const result = await prisma.user.create({
+    data: {
+      ...otherData,
+      email,
+      password: hashedPassword,
+      role: UserRole.USER
+    }
+  });
+  if (!result) {
+    throw new AppError_default(status7.INTERNAL_SERVER_ERROR, "Failed to create user");
+  }
+  const accessToken = token_default.getAccessToken({
+    id: result.id,
+    role: result.role,
+    email: result.email,
+    status: result.status,
+    firstName: result.firstName,
+    lastName: result.lastName
+  });
+  const refreshToken = token_default.getRefreshToken({
+    id: result.id,
+    role: result.role,
+    email: result.email,
+    status: result.status,
+    firstName: result.firstName,
+    lastName: result.lastName
+  });
+  const { password: userPassword, ...user } = result;
+  return {
+    accessToken,
+    refreshToken,
+    user
+  };
+};
+var loginUser = async (payload) => {
+  const { email, password } = payload;
+  const user = await prisma.user.findUnique({
+    where: {
+      email
+    }
+  });
+  if (!user) {
+    throw new AppError_default(status7.NOT_FOUND, "User not found");
+  }
+  const isPasswordMatched = await bcrypt.compare(password, user.password);
+  if (!isPasswordMatched) {
+    throw new AppError_default(status7.UNAUTHORIZED, "Invalid password");
+  }
+  if (user.status === UserStatus.BANNED) {
+    throw new AppError_default(status7.FORBIDDEN, "Your account has been banned");
+  }
+  const accessToken = token_default.getAccessToken({
+    id: user.id,
+    role: user.role,
+    email: user.email,
+    status: user.status,
+    firstName: user.firstName,
+    lastName: user.lastName
+  });
+  const refreshToken = token_default.getRefreshToken({
+    id: user.id,
+    role: user.role,
+    email: user.email,
+    status: user.status,
+    firstName: user.firstName,
+    lastName: user.lastName
+  });
+  const { password: userPassword, ...safeUser } = user;
+  return {
+    accessToken,
+    refreshToken,
+    user: safeUser
+  };
+};
+var changePassword = async (userId, payload) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+  if (!user) {
+    throw new AppError_default(status7.NOT_FOUND, "User not found");
+  }
+  const isPasswordMatched = await bcrypt.compare(payload.oldPassword, user.password);
+  if (!isPasswordMatched) {
+    throw new AppError_default(status7.UNAUTHORIZED, "Invalid old password");
+  }
+  if (payload.oldPassword === payload.newPassword) {
+    throw new AppError_default(status7.BAD_REQUEST, "New password cannot be same as old password");
+  }
+  const hashedPassword = await bcrypt.hash(payload.newPassword, 10);
+  await prisma.user.update({
+    where: { id: userId },
+    data: { password: hashedPassword }
+  });
+  return null;
+};
+var AuthService = {
+  registerUser,
+  loginUser,
+  changePassword
+};
+
+// src/app/module/auth/auth.controller.ts
+var registerUser2 = catchAsync(async (req, res) => {
+  const result = await AuthService.registerUser(req.body);
+  cookie_default.setAccessTokenCookie(res, result.accessToken);
+  cookie_default.setRefreshTokenCookie(res, result.refreshToken);
+  sendResponse(res, {
+    statusCode: status8.CREATED,
+    success: true,
+    message: "User registered successfully",
+    data: result
+  });
+});
+var loginUser2 = catchAsync(async (req, res) => {
+  const result = await AuthService.loginUser(req.body);
+  cookie_default.setAccessTokenCookie(res, result.accessToken);
+  cookie_default.setRefreshTokenCookie(res, result.refreshToken);
+  sendResponse(res, {
+    statusCode: status8.OK,
+    success: true,
+    message: "User logged in successfully",
+    data: result
+  });
+});
+var changePassword2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status8.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await AuthService.changePassword(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: status8.OK,
+    success: true,
+    message: "Password changed successfully",
+    data: result
+  });
+});
+var AuthController = {
+  registerUser: registerUser2,
+  loginUser: loginUser2,
+  changePassword: changePassword2
+};
+
+// src/app/module/auth/auth.validation.ts
+import { z as z3 } from "zod";
+var registerUserValidation = z3.object({
+  body: z3.object({
+    firstName: z3.string().min(1, "First name is required"),
+    lastName: z3.string().min(1, "Last name is required"),
+    email: z3.email(),
+    password: z3.string("Password is required").min(6, "Password must be at least 6 characters").max(20, "Password must be at most 20 characters"),
+    phone: z3.string().optional(),
+    gender: z3.enum(["MALE", "FEMALE", "OTHER"]).optional(),
+    profilePhoto: z3.string().optional()
+  })
+});
+var loginUserValidation = z3.object({
+  body: z3.object({
+    email: z3.email(),
+    password: z3.string("Password is required").min(6, "Password must be at least 6 characters").max(20, "Password must be at most 20 characters")
+  })
+});
+var changePasswordValidation = z3.object({
+  body: z3.object({
+    oldPassword: z3.string().min(1, "Old password is required"),
+    newPassword: z3.string().min(6, "Password must be at least 6 characters").max(20, "Password must be at most 20 characters")
+  })
+});
+var AuthValidation = {
+  registerUserValidation,
+  loginUserValidation,
+  changePasswordValidation
+};
+
+// src/app/module/auth/auth.route.ts
+var router2 = Router2();
+router2.post("/register", validateRequest(AuthValidation.registerUserValidation), AuthController.registerUser);
+router2.post("/login", validateRequest(AuthValidation.loginUserValidation), AuthController.loginUser);
+router2.post("/change-password", auth_default(UserRole.ADMIN, UserRole.USER), validateRequest(AuthValidation.changePasswordValidation), AuthController.changePassword);
+var AuthRoutes = router2;
+
+// src/app/module/eventCategory/eventCategory.route.ts
+import { Router as Router3 } from "express";
+
+// src/app/module/eventCategory/eventCategory.controller.ts
+import status9 from "http-status";
+
+// src/app/module/eventCategory/eventCategory.service.ts
+var createCategory = async (payload) => {
+  const result = await prisma.eventCategory.create({
+    data: payload
+  });
+  return result;
+};
+var getAllCategories = async () => {
+  const result = await prisma.eventCategory.findMany();
+  return result;
+};
+var getCategoryById = async (id) => {
+  const result = await prisma.eventCategory.findUnique({
+    where: {
+      id
+    }
+  });
+  return result;
+};
+var updateCategory = async (id, payload) => {
+  const result = await prisma.eventCategory.update({
+    where: {
+      id
+    },
+    data: payload
+  });
+  return result;
+};
+var deleteCategory = async (id) => {
+  const result = await prisma.eventCategory.delete({
+    where: {
+      id
+    }
+  });
+  return result;
+};
+var EventCategoryService = {
+  createCategory,
+  getAllCategories,
+  getCategoryById,
+  updateCategory,
+  deleteCategory
+};
+
+// src/app/module/eventCategory/eventCategory.controller.ts
+var createCategory2 = catchAsync(async (req, res) => {
+  const result = await EventCategoryService.createCategory(req.body);
+  sendResponse(res, {
+    statusCode: status9.CREATED,
+    success: true,
+    message: "Event category created successfully",
+    data: result
+  });
+});
+var getAllCategories2 = catchAsync(async (req, res) => {
+  const result = await EventCategoryService.getAllCategories();
+  sendResponse(res, {
+    statusCode: status9.OK,
+    success: true,
+    message: "Event categories fetched successfully",
+    data: result
+  });
+});
+var getCategoryById2 = catchAsync(async (req, res) => {
+  const result = await EventCategoryService.getCategoryById(
+    req.params.id
+  );
+  sendResponse(res, {
+    statusCode: status9.OK,
+    success: true,
+    message: "Event category fetched successfully",
+    data: result
+  });
+});
+var updateCategory2 = catchAsync(async (req, res) => {
+  const result = await EventCategoryService.updateCategory(
+    req.params.id,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: status9.OK,
+    success: true,
+    message: "Event category updated successfully",
+    data: result
+  });
+});
+var deleteCategory2 = catchAsync(async (req, res) => {
+  const result = await EventCategoryService.deleteCategory(
+    req.params.id
+  );
+  sendResponse(res, {
+    statusCode: status9.OK,
+    success: true,
+    message: "Event category deleted successfully",
+    data: result
+  });
+});
+var EventCategoryController = {
+  createCategory: createCategory2,
+  getAllCategories: getAllCategories2,
+  getCategoryById: getCategoryById2,
+  updateCategory: updateCategory2,
+  deleteCategory: deleteCategory2
+};
+
+// src/app/module/eventCategory/eventCategory.validation.ts
+import { z as z4 } from "zod";
+var createEventCategoryValidation = z4.object({
+  body: z4.object({
+    name: z4.string().min(1, "Name is required"),
+    icon: z4.string().min(1, "Icon is required")
+  })
+});
+var updateEventCategoryValidation = z4.object({
+  body: z4.object({
+    name: z4.string().min(1, "Name is required"),
+    icon: z4.string().min(1, "Icon is required")
+  })
+});
+var EventCategoryValidation = {
+  createEventCategoryValidation,
+  updateEventCategoryValidation
+};
+
+// src/app/module/eventCategory/eventCategory.route.ts
+var router3 = Router3();
+router3.post(
+  "/",
+  auth_default(UserRole.ADMIN),
+  validateRequest(EventCategoryValidation.createEventCategoryValidation),
+  EventCategoryController.createCategory
+);
+router3.get("/", EventCategoryController.getAllCategories);
+router3.get("/:id", EventCategoryController.getCategoryById);
+router3.put(
+  "/:id",
+  auth_default(UserRole.ADMIN),
+  validateRequest(EventCategoryValidation.updateEventCategoryValidation),
+  EventCategoryController.updateCategory
+);
+router3.delete(
+  "/:id",
+  auth_default(UserRole.ADMIN),
+  EventCategoryController.deleteCategory
+);
+var EventCategoryRoutes = router3;
+
+// src/app/module/event/event.route.ts
+import { Router as Router4 } from "express";
+
+// src/app/module/event/event.controller.ts
+import status11 from "http-status";
+
+// src/app/module/event/event.service.ts
+import status10 from "http-status";
+var createEvent = async (creatorId, payload) => {
+  const { startTime, endTime, ...rest } = payload;
+  const startTimeDate = new Date(startTime);
+  const endTimeDate = new Date(endTime);
+  if (startTimeDate >= endTimeDate) {
+    throw new AppError_default(
+      status10.BAD_REQUEST,
+      "Start time must be before end time"
+    );
+  }
+  const event = await prisma.event.create({
+    data: {
+      ...rest,
+      startTime: startTimeDate,
+      endTime: endTimeDate,
+      creatorId
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true
+        }
+      }
+    }
+  });
+  return event;
+};
+var getAllEvents = async (query) => {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 10;
+  const skip = (page - 1) * limit;
+  const searchTerm = query.searchTerm;
+  const sortBy = query.sortBy || "createdAt";
+  const sortOrder = query.sortOrder || "desc";
+  const whereConditions = [];
+  if (searchTerm) {
+    whereConditions.push({
+      OR: [
+        ...EventSearchableFields.map((field) => ({
+          [field]: {
+            contains: searchTerm,
+            mode: "insensitive"
+          }
+        })),
+        {
+          category: {
+            name: {
+              contains: searchTerm,
+              mode: "insensitive"
+            }
+          }
+        },
+        {
+          creator: {
+            OR: [
+              {
+                firstName: {
+                  contains: searchTerm,
+                  mode: "insensitive"
+                }
+              },
+              {
+                lastName: {
+                  contains: searchTerm,
+                  mode: "insensitive"
+                }
+              },
+              {
+                email: {
+                  contains: searchTerm,
+                  mode: "insensitive"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    });
+  }
+  const excludeFields = [
+    "searchTerm",
+    "page",
+    "limit",
+    "sortBy",
+    "sortOrder",
+    "fields"
+  ];
+  const filterData = Object.fromEntries(
+    Object.entries(query).filter(([key]) => !excludeFields.includes(key))
+  );
+  if (Object.keys(filterData).length > 0) {
+    const formattedFilterData = {};
+    const feeFilter = {};
+    for (const [key, value] of Object.entries(filterData)) {
+      if (key === "capacity") {
+        formattedFilterData[key] = Number(value);
+      } else if (key === "fee") {
+        feeFilter.equals = Number(value);
+      } else if (key === "minFee") {
+        feeFilter.gte = Number(value);
+      } else if (key === "maxFee") {
+        feeFilter.lte = Number(value);
+      } else if (key === "type") {
+        if (value === "paid") feeFilter.gt = 0;
+        else if (value === "free") feeFilter.equals = 0;
+      } else if (key === "eventStatus") {
+        const now = /* @__PURE__ */ new Date();
+        if (value === EVENT_STATUS.UPCOMING) {
+          formattedFilterData["startTime"] = { gt: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.ONGOING) {
+          formattedFilterData["startTime"] = { lte: now };
+          formattedFilterData["endTime"] = { gte: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.COMPLETED) {
+          formattedFilterData["endTime"] = { lt: now };
+          formattedFilterData["isCancelled"] = false;
+        } else if (value === EVENT_STATUS.CANCELLED) {
+          formattedFilterData["isCancelled"] = true;
+        }
+      } else if (["isFeatured", "isDeleted"].includes(key)) {
+        formattedFilterData[key] = value === "true";
+      } else if (["startTime", "endTime"].includes(key)) {
+        formattedFilterData[key] = new Date(value);
+      } else if (key === "category") {
+        formattedFilterData[key] = {
+          name: { contains: value, mode: "insensitive" }
+        };
+      } else if (key === "title" || key === "description" || key === "address" || key === "country" || key === "city") {
+        formattedFilterData[key] = {
+          contains: value,
+          mode: "insensitive"
+        };
+      } else if (key === "creator") {
+        formattedFilterData[key] = {
+          OR: [
+            {
+              firstName: {
+                contains: value,
+                mode: "insensitive"
+              }
+            },
+            {
+              lastName: {
+                contains: value,
+                mode: "insensitive"
+              }
+            },
+            {
+              email: {
+                contains: value,
+                mode: "insensitive"
+              }
+            }
+          ]
+        };
+      } else {
+        formattedFilterData[key] = value;
+      }
+    }
+    if (Object.keys(feeFilter).length > 0) {
+      formattedFilterData["fee"] = feeFilter;
+    }
+    whereConditions.push(formattedFilterData);
+  }
+  const whereClause = whereConditions.length > 0 ? { AND: whereConditions } : {};
+  const [result, total] = await Promise.all([
+    prisma.event.findMany({
+      where: whereClause,
+      skip,
+      take: limit,
+      orderBy: { [sortBy]: sortOrder },
+      include: {
+        category: true,
+        creator: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            profilePhoto: true
+          }
+        },
+        eventParticipations: true
+      }
+    }),
+    prisma.event.count({ where: whereClause })
+  ]);
+  return {
+    meta: {
+      page,
+      limit,
+      total,
+      totalPage: Math.ceil(total / limit)
+    },
+    data: result
+  };
+};
+var getEventById = async (id) => {
+  const event = await prisma.event.findUnique({
+    where: {
+      id,
+      isDeleted: false
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true
+        }
+      },
+      reviews: true,
+      eventParticipations: {
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+              profilePhoto: true
+            }
+          }
+        }
+      }
+    }
+  });
+  if (!event) {
+    throw new AppError_default(status10.NOT_FOUND, "Event not found");
+  }
+  return event;
+};
+var getMyCreatedEvents = async (creatorId) => {
+  const events = await prisma.event.findMany({
+    where: {
+      creatorId,
+      isDeleted: false
+    },
+    include: {
+      category: true,
+      eventParticipations: {
+        where: {
+          participationStatus: "CONFIRMED"
+        }
+      },
+      creator: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true
+        }
+      }
+    }
+  });
+  return events;
+};
+var makeEventFeatured = async (id) => {
+  const event = await prisma.event.findUnique({
+    where: {
+      id,
+      isDeleted: false
+    },
+    include: {
+      category: true,
+      creator: {
+        select: {
+          firstName: true,
+          lastName: true,
+          email: true,
+          profilePhoto: true
+        }
+      }
+    }
+  });
+  if (!event) {
+    throw new AppError_default(status10.NOT_FOUND, "Event not found");
+  }
+  const result = await prisma.event.update({
+    where: {
+      id
+    },
+    data: {
+      isFeatured: !event.isFeatured
+    }
+  });
+  return result;
+};
+var EventService = {
+  createEvent,
+  getAllEvents,
+  getEventById,
+  getMyCreatedEvents,
+  makeEventFeatured
+};
+
+// src/app/module/event/event.controller.ts
+var createEvent2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status11.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await EventService.createEvent(
+    req.user.id,
+    req.body
+  );
+  sendResponse(res, {
+    statusCode: status11.CREATED,
+    success: true,
+    message: "Event created successfully",
+    data: result
+  });
+});
+var getAllEvents2 = catchAsync(async (req, res) => {
+  const result = await EventService.getAllEvents(req.query);
+  sendResponse(res, {
+    statusCode: status11.OK,
+    success: true,
+    message: "Events fetched successfully",
+    data: result
+  });
+});
+var getEventById2 = catchAsync(async (req, res) => {
+  const result = await EventService.getEventById(req.params.id);
+  sendResponse(res, {
+    statusCode: status11.OK,
+    success: true,
+    message: "Event fetched successfully",
+    data: result
+  });
+});
+var getMyCreatedEvents2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status11.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await EventService.getMyCreatedEvents(req.user.id);
+  sendResponse(res, {
+    statusCode: status11.OK,
+    success: true,
+    message: "My events fetched successfully",
+    data: result
+  });
+});
+var makeEventFeatured2 = catchAsync(async (req, res) => {
+  const result = await EventService.makeEventFeatured(req.params.id);
+  sendResponse(res, {
+    statusCode: status11.OK,
+    success: true,
+    message: "Event featured changed successfully",
+    data: result
+  });
+});
+var EventController = {
+  createEvent: createEvent2,
+  getAllEvents: getAllEvents2,
+  getEventById: getEventById2,
+  getMyCreatedEvents: getMyCreatedEvents2,
+  makeEventFeatured: makeEventFeatured2
+};
+
+// src/app/module/event/event.validation.ts
+import { z as z5 } from "zod";
+var createEventValidation = z5.object({
+  body: z5.object({
+    title: z5.string().min(1, "Title is required"),
+    description: z5.string().min(1, "Description is required"),
+    imageURL: z5.string().optional(),
+    startTime: z5.string().min(1, "Start time is required"),
+    endTime: z5.string().min(1, "End time is required"),
+    country: z5.string().min(1, "Country is required"),
+    city: z5.string().min(1, "City is required"),
+    address: z5.string().min(1, "Address is required"),
+    postalCode: z5.string().min(1, "Postal code is required"),
+    fee: z5.number({ message: "Fee is required" }),
+    capacity: z5.number({ message: "Capacity is required" }),
+    categoryId: z5.string().min(1, "Category ID is required")
+  })
+});
+var EventValidation = {
+  createEventValidation
+};
+
+// src/app/module/event/event.route.ts
+var router4 = Router4();
+router4.post(
+  "/",
+  auth_default(UserRole.ADMIN, UserRole.USER),
+  validateRequest(EventValidation.createEventValidation),
+  EventController.createEvent
+);
+router4.get("/", EventController.getAllEvents);
+router4.get(
+  "/my-created-events",
+  auth_default(UserRole.ADMIN, UserRole.USER),
+  EventController.getMyCreatedEvents
+);
+router4.get("/:id", EventController.getEventById);
+router4.put(
+  "/:id/feature",
+  auth_default(UserRole.ADMIN),
+  EventController.makeEventFeatured
+);
+var EventRoutes = router4;
+
+// src/app/module/eventParticipation/eventParticipation.route.ts
+import { Router as Router5 } from "express";
+
+// src/app/module/eventParticipation/eventParticipation.controller.ts
+import status13 from "http-status";
+
+// src/app/module/eventParticipation/eventParticipation.service.ts
+import status12 from "http-status";
+
+// src/app/lib/stripe.ts
+import Stripe from "stripe";
+var stripe = new Stripe(env_default.STRIPE_SECRET_KEY, {
+  apiVersion: "2026-02-25.clover"
+});
+
+// src/app/module/eventParticipation/eventParticipation.service.ts
+import { uuidv7 } from "uuidv7";
+var joinEvent = async (userId, eventId) => {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      _count: {
+        select: {
+          eventParticipations: { where: { participationStatus: "CONFIRMED" } }
+        }
+      }
+    }
+  });
+  if (!event) throw new AppError_default(status12.NOT_FOUND, "Event not found");
+  if (event._count.eventParticipations >= event.capacity) {
+    throw new AppError_default(status12.BAD_REQUEST, "Event is full");
+  }
+  const existingParticipation = await prisma.eventParticipation.findUnique({
+    where: { userId_eventId: { userId, eventId } }
+  });
+  if (existingParticipation) {
+    throw new AppError_default(status12.CONFLICT, "Already joined this event");
+  }
+  if (event.fee === 0) {
+    const participation = await prisma.eventParticipation.create({
+      data: {
+        userId,
+        eventId,
+        participationStatus: ParticipationStatus.CONFIRMED,
+        joinedAt: /* @__PURE__ */ new Date()
+      }
+    });
+    return {
+      participation,
+      payment: null,
+      paymentURL: null,
+      // No redirect needed
+      message: "Successfully joined the free event!"
+    };
+  }
+  const dbResult = await prisma.$transaction(async (tx) => {
+    const participation = await tx.eventParticipation.create({
+      data: { userId, eventId }
+    });
+    const paymentData = await tx.payment.create({
+      data: {
+        participationId: participation.id,
+        amount: event.fee,
+        transactionId: `TXN-${uuidv7()}`
+      }
+    });
+    return { participation, paymentData };
+  });
+  try {
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: "usd",
+            product_data: { name: event.title },
+            unit_amount: Math.round(event.fee * 100)
+            // Secure float handling
+          },
+          quantity: 1
+        }
+      ],
+      metadata: {
+        participationId: dbResult.participation.id,
+        paymentId: dbResult.paymentData.id
+        // Corrected: passing Payment ID, not Participation ID
+      },
+      success_url: `${env_default.FRONTEND_URL}/payment/payment-success`,
+      cancel_url: `${env_default.FRONTEND_URL}/events/${eventId}`
+    });
+    return {
+      participation: dbResult.participation,
+      payment: dbResult.paymentData,
+      paymentURL: session.url
+    };
+  } catch (error) {
+    console.error("Stripe Session Creation Failed:", error);
+    return {
+      participation: dbResult.participation,
+      payment: dbResult.paymentData,
+      paymentURL: null,
+      // UI can show a "Retry Payment" button
+      error: "Payment gateway unavailable, please try again from your dashboard."
+    };
+  }
+};
+var joinEventWithPayLater = async (userId, eventId) => {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    include: {
+      _count: {
+        select: {
+          eventParticipations: { where: { participationStatus: "CONFIRMED" } }
+        }
+      }
+    }
+  });
+  if (!event) throw new AppError_default(status12.NOT_FOUND, "Event not found");
+  if (event._count.eventParticipations >= event.capacity) {
+    throw new AppError_default(status12.BAD_REQUEST, "Event is full");
+  }
+  const existingParticipation = await prisma.eventParticipation.findUnique({
+    where: { userId_eventId: { userId, eventId } }
+  });
+  if (existingParticipation) {
+    throw new AppError_default(status12.CONFLICT, "Already joined this event");
+  }
+  const result = await prisma.$transaction(async (tx) => {
+    const participation = await tx.eventParticipation.create({
+      data: {
+        userId,
+        eventId
+      }
+    });
+    const transactionId = `TXN-${uuidv7()}`;
+    console.log(transactionId);
+    const paymentData = await tx.payment.create({
+      data: {
+        participationId: participation.id,
+        amount: event.fee,
+        transactionId
+      }
+    });
+    return { participation, payment: paymentData };
+  });
+  return result;
+};
+var getMyParticipations = async (userId) => {
+  const participations = await prisma.eventParticipation.findMany({
+    where: { userId },
+    include: {
+      event: true
+    }
+  });
+  return participations;
+};
+var initiatePayment = async (eventParticipationId) => {
+  const participation = await prisma.eventParticipation.findUniqueOrThrow({
+    where: {
+      id: eventParticipationId
+    },
+    include: {
+      user: true,
+      payment: true,
+      event: true
+    }
+  });
+  if (!participation.payment) {
+    throw new AppError_default(status12.BAD_REQUEST, "Payment not found");
+  }
+  if (participation.payment.paymentStatus === PaymentStatus.PAID) {
+    throw new AppError_default(
+      status12.CONFLICT,
+      "Payment already processed for this participation"
+    );
+  }
+  if (participation.participationStatus === ParticipationStatus.CONFIRMED || participation.participationStatus === ParticipationStatus.CANCELLED) {
+    throw new AppError_default(
+      status12.BAD_REQUEST,
+      "Payment cannot be initiated for this participation"
+    );
+  }
+  const session = await stripe.checkout.sessions.create({
+    payment_method_types: ["card"],
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: participation.event.title
+          },
+          unit_amount: Math.round(participation.event.fee * 100)
+        },
+        quantity: 1
+      }
+    ],
+    metadata: {
+      participationId: participation.id,
+      paymentId: participation.payment?.id
+    },
+    success_url: `${env_default.FRONTEND_URL}/payment/payment-success`,
+    cancel_url: `${env_default.FRONTEND_URL}/events/${participation.eventId}`
+  });
+  return {
+    paymentURL: session.url
+  };
+};
+var EventParticipationService = {
+  joinEvent,
+  getMyParticipations,
+  initiatePayment,
+  joinEventWithPayLater
+};
+
+// src/app/module/eventParticipation/eventParticipation.controller.ts
+var joinEvent2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status13.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await EventParticipationService.joinEvent(
+    req.user.id,
+    req.body.eventId
+  );
+  sendResponse(res, {
+    statusCode: status13.CREATED,
+    success: true,
+    message: "Successfully joined the event",
+    data: result
+  });
+});
+var joinEventWithPayLater2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status13.UNAUTHORIZED, "Unauthorized");
+  }
+  const payload = req.body;
+  const user = req.user;
+  const result = await EventParticipationService.joinEventWithPayLater(
+    user.id,
+    payload.eventId
+  );
+  sendResponse(res, {
+    statusCode: status13.CREATED,
+    success: true,
+    message: "Successfully joined the event, please complete the payment",
+    data: result
+  });
+});
+var initiatePayment2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status13.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await EventParticipationService.initiatePayment(
+    req.params.participationId
+  );
+  sendResponse(res, {
+    statusCode: status13.CREATED,
+    success: true,
+    message: "Successfully initiated payment",
+    data: result
+  });
+});
+var getMyParticipations2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status13.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await EventParticipationService.getMyParticipations(
+    req.user.id
+  );
+  sendResponse(res, {
+    statusCode: status13.OK,
+    success: true,
+    message: "Participations fetched successfully",
+    data: result
+  });
+});
+var EventParticipationController = {
+  joinEvent: joinEvent2,
+  getMyParticipations: getMyParticipations2,
+  joinEventWithPayLater: joinEventWithPayLater2,
+  initiatePayment: initiatePayment2
+};
+
+// src/app/module/eventParticipation/eventParticipation.validation.ts
+import { z as z6 } from "zod";
+var createParticipationValidation = z6.object({
+  body: z6.object({
+    eventId: z6.string().min(1, "Event ID is required")
+  })
+});
+var EventParticipationValidation = {
+  createParticipationValidation
+};
+
+// src/app/module/eventParticipation/eventParticipation.route.ts
+var router5 = Router5();
+router5.post(
+  "/join",
+  auth_default(UserRole.USER, UserRole.ADMIN),
+  validateRequest(EventParticipationValidation.createParticipationValidation),
+  EventParticipationController.joinEvent
+);
+router5.post(
+  "/join-with-pay-later",
+  auth_default(UserRole.USER, UserRole.ADMIN),
+  validateRequest(EventParticipationValidation.createParticipationValidation),
+  EventParticipationController.joinEventWithPayLater
+);
+router5.post(
+  "/initiate-payment/:participationId",
+  auth_default(UserRole.USER, UserRole.ADMIN),
+  EventParticipationController.initiatePayment
+);
+router5.get(
+  "/my-participations",
+  auth_default(UserRole.USER, UserRole.ADMIN),
+  EventParticipationController.getMyParticipations
+);
+var EventParticipationRoutes = router5;
+
+// src/app/module/review/review.route.ts
+import { Router as Router6 } from "express";
+
+// src/app/module/review/review.controller.ts
+import status15 from "http-status";
+
+// src/app/module/review/review.service.ts
+import status14 from "http-status";
+var createReview = async (userId, payload) => {
+  const { eventId, rating, comment } = payload;
+  const event = await prisma.event.findUnique({
+    where: { id: eventId }
+  });
+  if (!event) {
+    throw new AppError_default(status14.NOT_FOUND, "Event not found");
+  }
+  if (event.eventStatus !== EVENT_STATUS.COMPLETED) {
+    throw new AppError_default(status14.BAD_REQUEST, "Review can only be given after the event is completed");
+  }
+  const participation = await prisma.eventParticipation.findUnique({
+    where: {
+      userId_eventId: {
+        userId,
+        eventId
+      }
+    }
+  });
+  if (!participation || participation.participationStatus !== ParticipationStatus.CONFIRMED) {
+    throw new AppError_default(status14.FORBIDDEN, "You can only review events you have fully participated in");
+  }
+  const existingReview = await prisma.review.findUnique({
+    where: {
+      userId_eventId: {
+        userId,
+        eventId
+      }
+    }
+  });
+  if (existingReview) {
+    throw new AppError_default(status14.CONFLICT, "You have already reviewed this event");
+  }
+  const review = await prisma.review.create({
+    data: {
+      userId,
+      eventId,
+      rating,
+      comment
+    }
+  });
+  return review;
+};
+var getEventReviews = async (eventId) => {
+  const reviews = await prisma.review.findMany({
+    where: { eventId },
+    include: {
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          profilePhoto: true
+        }
+      }
+    }
+  });
+  return reviews;
+};
+var ReviewService = {
+  createReview,
+  getEventReviews
+};
+
+// src/app/module/review/review.controller.ts
+var createReview2 = catchAsync(async (req, res) => {
+  if (!req.user) {
+    throw new AppError_default(status15.UNAUTHORIZED, "Unauthorized");
+  }
+  const result = await ReviewService.createReview(req.user.id, req.body);
+  sendResponse(res, {
+    statusCode: status15.CREATED,
+    success: true,
+    message: "Review submitted successfully",
+    data: result
+  });
+});
+var getEventReviews2 = catchAsync(async (req, res) => {
+  const result = await ReviewService.getEventReviews(req.params.eventId);
+  sendResponse(res, {
+    statusCode: status15.OK,
+    success: true,
+    message: "Reviews fetched successfully",
+    data: result
+  });
+});
+var ReviewController = {
+  createReview: createReview2,
+  getEventReviews: getEventReviews2
+};
+
+// src/app/module/review/review.validation.ts
+import { z as z7 } from "zod";
+var createReviewValidation = z7.object({
+  body: z7.object({
+    eventId: z7.string().min(1, "Event ID is required"),
+    rating: z7.number().min(1, "Rating must be at least 1").max(5, "Rating must be at most 5"),
+    comment: z7.string().min(1, "Comment is required")
+  })
+});
+var ReviewValidation = {
+  createReviewValidation
+};
+
+// src/app/module/review/review.route.ts
+var router6 = Router6();
+router6.post("/", auth_default(UserRole.USER, UserRole.ADMIN), validateRequest(ReviewValidation.createReviewValidation), ReviewController.createReview);
+router6.get("/event/:eventId", ReviewController.getEventReviews);
+var ReviewRoutes = router6;
+
+// src/app/module/dashboard/dashboard.routes.ts
+import { Router as Router7 } from "express";
+
+// src/app/module/dashboard/dashboard.controller.ts
+import httpStatus2 from "http-status";
+
+// src/app/module/dashboard/dashboard.service.ts
+var getUserDashboardStats = async (userId) => {
+  return await prisma.$transaction(async (tx) => {
+    const hostedEventsCount = await tx.event.count({
+      where: { creatorId: userId, isDeleted: false }
+    });
+    const totalRevenue = await tx.payment.aggregate({
+      where: {
+        participation: { event: { creatorId: userId } },
+        paymentStatus: "PAID"
+      },
+      _sum: { amount: true }
+    });
+    const totalAttendees = await tx.eventParticipation.count({
+      where: {
+        event: { creatorId: userId },
+        participationStatus: "CONFIRMED"
+      }
+    });
+    const joinedEventsCount = await tx.eventParticipation.count({
+      where: { userId }
+    });
+    const totalSpent = await tx.payment.aggregate({
+      where: {
+        participation: { userId },
+        paymentStatus: "PAID"
+      },
+      _sum: { amount: true }
+    });
+    return {
+      host: {
+        eventsHosted: hostedEventsCount,
+        revenue: totalRevenue._sum.amount || 0,
+        attendees: totalAttendees
+      },
+      participant: {
+        eventsJoined: joinedEventsCount,
+        totalSpent: totalSpent._sum.amount || 0
+      }
+    };
+  });
+};
+var getAdminDashboardStats = async () => {
+  const now = /* @__PURE__ */ new Date();
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return await prisma.$transaction(async (tx) => {
+    const roleBreakdown = await tx.user.groupBy({
+      by: ["role"],
+      _count: { _all: true }
+    });
+    const currentMonthRevenue = await tx.payment.aggregate({
+      where: {
+        paymentStatus: "PAID",
+        createdAt: { gte: startOfCurrentMonth }
+      },
+      _sum: { amount: true }
+    });
+    const lastMonthRevenue = await tx.payment.aggregate({
+      where: {
+        paymentStatus: "PAID",
+        createdAt: {
+          gte: startOfLastMonth,
+          lt: startOfCurrentMonth
+        }
+      },
+      _sum: { amount: true }
+    });
+    const totalActiveUsers = await tx.user.count({
+      where: { status: "ACTIVE" }
+    });
+    const totalInactiveUsers = await tx.user.count({
+      where: { status: "BANNED" }
+    });
+    const totalEvents = await tx.event.count({ where: { isDeleted: false } });
+    const totalParticipations = await tx.eventParticipation.count();
+    const totalRevenue = await tx.payment.aggregate({
+      where: { paymentStatus: "PAID" },
+      _sum: { amount: true }
+    });
+    const categoryBreakdown = await tx.eventCategory.findMany({
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { events: { where: { isDeleted: false } } }
+        }
+      }
+    });
+    const currentRev = currentMonthRevenue._sum.amount || 0;
+    const lastRev = lastMonthRevenue._sum.amount || 0;
+    const revenueGrowth = lastRev === 0 ? 100 : (currentRev - lastRev) / lastRev * 100;
+    return {
+      users: {
+        totalActive: totalActiveUsers,
+        totalInactive: totalInactiveUsers,
+        roles: roleBreakdown
+        // [{ role: 'ADMIN', _count: { _all: 5 } }, ...]
+      },
+      events: {
+        total: totalEvents,
+        participations: totalParticipations,
+        categories: categoryBreakdown
+      },
+      revenue: {
+        total: totalRevenue._sum.amount || 0,
+        currentMonth: currentRev,
+        lastMonth: lastRev,
+        growthPercentage: parseFloat(revenueGrowth.toFixed(2))
+      }
+    };
+  });
+};
+var DashboardService = {
+  getUserDashboardStats,
+  getAdminDashboardStats
+};
+
+// src/app/module/dashboard/dashboard.controller.ts
+var getUserDashboard = catchAsync(async (req, res) => {
+  const userId = req.user.id;
+  const result = await DashboardService.getUserDashboardStats(userId);
+  sendResponse(res, {
+    statusCode: httpStatus2.OK,
+    success: true,
+    message: "Dashboard stats fetched successfully",
+    data: result
+  });
+});
+var getAdminDashboard = catchAsync(async (req, res) => {
+  const result = await DashboardService.getAdminDashboardStats();
+  sendResponse(res, {
+    statusCode: httpStatus2.OK,
+    success: true,
+    message: "Admin dashboard stats fetched successfully",
+    data: result
+  });
+});
+var DashboardController = {
+  getUserDashboard,
+  getAdminDashboard
+};
+
+// src/app/module/dashboard/dashboard.routes.ts
+var router7 = Router7();
+router7.get("/user", auth_default(UserRole.USER), DashboardController.getUserDashboard);
+router7.get(
+  "/admin",
+  auth_default(UserRole.ADMIN),
+  DashboardController.getAdminDashboard
+);
+var DashboardRoutes = router7;
+
+// src/app/routes/index.ts
+var router8 = Router8();
+router8.use("/users", UserRoutes);
+router8.use("/auth", AuthRoutes);
+router8.use("/event-categories", EventCategoryRoutes);
+router8.use("/events", EventRoutes);
+router8.use("/participations", EventParticipationRoutes);
+router8.use("/reviews", ReviewRoutes);
+router8.use("/dashboard", DashboardRoutes);
+var IndexRoutes = router8;
+
+// src/app/module/payment/payment.controller.ts
+import status16 from "http-status";
+
+// src/app/module/payment/payment.service.ts
+var handleStripeWebhookEvent = async (event) => {
+  const existingPayment = await prisma.payment.findFirst({
+    where: { stripeEventId: event.id }
+  });
+  if (existingPayment) {
+    console.log("Payment already processed for this participation");
+    return {
+      message: "Payment already processed for this participation. Skipping..."
+    };
+  }
+  switch (event.type) {
+    case "checkout.session.completed": {
+      const session = event.data.object;
+      const participationId = session.metadata?.participationId;
+      const paymentId = session.metadata?.paymentId;
+      if (!participationId || !paymentId) {
+        console.error("Missing metadata");
+        return {
+          message: "Missing metadata"
+        };
+      }
+      const participation = await prisma.eventParticipation.findUnique({
+        where: { id: participationId },
+        include: { payment: true }
+      });
+      if (!participation) {
+        console.error("Participation not found");
+        return {
+          message: "Participation not found"
+        };
+      }
+      await prisma.$transaction(async (tx) => {
+        await tx.eventParticipation.update({
+          where: { id: participationId },
+          data: {
+            participationStatus: session.payment_status === "paid" ? ParticipationStatus.CONFIRMED : ParticipationStatus.PENDING
+          }
+        });
+        await tx.payment.update({
+          where: { id: paymentId },
+          data: {
+            paymentStatus: session.payment_status === "paid" ? PaymentStatus.PAID : PaymentStatus.PENDING,
+            stripeEventId: event.id,
+            paymentGatewayData: session
+          }
+        });
+      });
+      console.log(
+        `Payment confirmed successfully for participation ${participationId} and payment ${paymentId}`
+      );
+      break;
+    }
+    case "checkout.session.expired": {
+      const session = event.data.object;
+      console.log(
+        `Checkout session expired for session ${session.id}. Marking associated payment as failed`
+      );
+      break;
+    }
+    case "payment_intent.payment_failed": {
+      const session = event.data.object;
+      console.log(
+        `Payment intent failed for session ${session.id}. Marking associated payment as failed`
+      );
+      break;
+    }
+    default:
+      console.log(`Unhandled event type ${event.type}`);
+  }
+  return {
+    message: `Webhook event ${event.id} handled successfully`
+  };
+};
+var PaymentService = {
+  handleStripeWebhookEvent
+};
+
+// src/app/module/payment/payment.controller.ts
+var handleStripeWebhookEvent2 = catchAsync(
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    const webhookSecret = env_default.STRIPE_WEBHOOK_SECRET;
+    if (!signature || !webhookSecret) {
+      console.log("Missing stripe signature or webhook secret");
+      return res.status(status16.BAD_REQUEST).json({
+        message: "Missing stripe signature or webhook secret"
+      });
+    }
+    let event;
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        signature,
+        webhookSecret
+      );
+    } catch (error) {
+      console.log("Error constructing webhook event", error);
+      return res.status(status16.BAD_REQUEST).json({
+        message: "Error constructing webhook event"
+      });
+    }
+    try {
+      const result = await PaymentService.handleStripeWebhookEvent(event);
+      sendResponse(res, {
+        statusCode: status16.OK,
+        success: true,
+        message: "Webhook event handled successfully",
+        data: result
+      });
+    } catch (error) {
+      console.log("Error handling webhook event", error);
+      return res.status(status16.BAD_REQUEST).json({
+        message: "Error handling webhook event"
+      });
+    }
+  }
+);
+var PaymentController = {
+  handleStripeWebhookEvent: handleStripeWebhookEvent2
+};
+
+// src/app.ts
+var app = express();
+app.post(
+  "/webhook",
+  express.raw({ type: "application/json" }),
+  PaymentController.handleStripeWebhookEvent
+);
+app.use(express.urlencoded({ extended: true }));
+app.use(express.json());
+app.use(cookieParser());
+app.use(
+  cors({
+    origin: env_default.FRONTEND_URL,
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allowedHeaders: ["Content-Type", "Authorization"]
+  })
+);
+app.use("/api/v1", IndexRoutes);
+app.get("/", async (req, res) => {
+  res.send("Hello from Planora-Backend");
+});
+app.use(notFound);
+app.use(globalErrorHandler);
+var app_default = app;
+
+// src/index.ts
+var index_default = app_default;
+export {
+  index_default as default
+};
