@@ -68,7 +68,7 @@ Planora is built with a modern and powerful tech stack designed for speed, relia
    JWT_REFRESH_SECRET=your_secret
    FRONTEND_URL=http://localhost:3000
    # Or point it to hosted frontend url
-   # FRONTEND_URL=https://planora-frontend.vercel.app
+   # FRONTEND_URL=https://planora-frontend-ruddy.vercel.app
    STRIPE_SECRET_KEY=your_stripe_key
    STRIPE_WEBHOOK_SECRET=your_webhook_secret
    ```
