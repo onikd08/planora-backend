@@ -7,11 +7,7 @@ import { UserValidation } from "./user.validation";
 
 const router = Router();
 
-router.put(
-  "/create-admin/:id",
-  auth(UserRole.ADMIN),
-  UserController.changeRole,
-);
+router.put("/update-role/:id", auth(UserRole.ADMIN), UserController.changeRole);
 router.put(
   "/update-profile",
   auth(UserRole.USER, UserRole.ADMIN),

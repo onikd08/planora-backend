@@ -5,48 +5,48 @@ import { IUpdateProfile } from "./user.interface";
 import status from "http-status";
 import AppError from "../../errorHelpers/AppError";
 
-const changeRole = async (id: string) => {
+import { JwtPayload } from "jsonwebtoken";
+
+const changeRole = async (
+  id: string,
+  role: UserRole,
+  currentUser: JwtPayload,
+) => {
   const user = await prisma.user.findUniqueOrThrow({
     where: {
       id,
     },
   });
 
-  if (user.role === UserRole.USER) {
-    const result = await prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        role: UserRole.ADMIN,
-      },
-    });
-
-    const { password: userPassword, ...safeUser } = result;
-
-    return safeUser;
+  if (currentUser.id === user.id) {
+    throw new AppError(status.FORBIDDEN, "You cannot change your own role");
   }
 
-  if (user.role === UserRole.ADMIN) {
-    const result = await prisma.user.update({
-      where: {
-        id: user.id,
-      },
-      data: {
-        role: UserRole.USER,
-      },
-    });
+  const result = await prisma.user.update({
+    where: {
+      id: user.id,
+    },
+    data: {
+      role,
+    },
+  });
 
-    const { password: userPassword, ...safeUser } = result;
+  const { password: userPassword, ...safeUser } = result;
 
-    return safeUser;
-  }
+  return safeUser;
 };
 
-const getAllUsers = async () => {
+const getAllUsers = async (role?: string) => {
+  const where: any = {};
+
+  if (role && Object.values(UserRole).includes(role as UserRole)) {
+    where.role = role;
+  }
+
   const users = await prisma.user.findMany({
-    where: {
-      status: UserStatus.ACTIVE,
+    where,
+    orderBy: {
+      createdAt: "desc",
     },
   });
 

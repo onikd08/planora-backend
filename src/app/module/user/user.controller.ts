@@ -4,9 +4,19 @@ import catchAsync from "../../shared/catchAsync";
 import sendResponse from "../../shared/sendResponse";
 import { UserService } from "./user.service";
 import AppError from "../../errorHelpers/AppError";
+import { UserRole } from "../../../generated/prisma/enums";
 
 const changeRole = catchAsync(async (req, res) => {
-  const result = await UserService.changeRole(req.params.id as string);
+  if (!req.user) {
+    throw new AppError(status.UNAUTHORIZED, "Unauthorized");
+  }
+  const currentUser = req.user;
+
+  const result = await UserService.changeRole(
+    req.params.id as string,
+    req.body.role as UserRole,
+    currentUser,
+  );
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
@@ -26,7 +36,7 @@ const updateStatus = catchAsync(async (req, res) => {
 });
 
 const getAllUsers = catchAsync(async (req, res) => {
-  const result = await UserService.getAllUsers();
+  const result = await UserService.getAllUsers(req.query.role as string);
   sendResponse(res, {
     statusCode: status.OK,
     success: true,
