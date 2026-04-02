@@ -66,7 +66,9 @@ Planora is built with a modern and powerful tech stack designed for speed, relia
    DATABASE_URL=your_postgresql_url
    JWT_ACCESS_SECRET=your_secret
    JWT_REFRESH_SECRET=your_secret
-   FRONTEND_URL=http://localhost:3000 || vercel_url
+   FRONTEND_URL=http://localhost:3000
+   # Or point it to hosted frontend url
+   # FRONTEND_URL=https://planora-frontend.vercel.app
    STRIPE_SECRET_KEY=your_stripe_key
    STRIPE_WEBHOOK_SECRET=your_webhook_secret
    ```
