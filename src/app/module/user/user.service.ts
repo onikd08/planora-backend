@@ -61,14 +61,22 @@ const getUserById = async (id: string) => {
     where: {
       id,
     },
+    include: {
+      eventParticipations: {
+        include: {
+          event: {
+            include: {
+              category: true,
+            },
+          },
+        },
+      },
+      events: true,
+    },
   });
 
   if (!user) {
     throw new AppError(status.NOT_FOUND, "User not found");
-  }
-
-  if (user.status !== UserStatus.ACTIVE) {
-    throw new AppError(status.FORBIDDEN, "User is not active");
   }
 
   const { password: userPassword, ...safeUser } = user;
