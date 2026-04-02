@@ -1,146 +1,155 @@
 import bcrypt from "bcrypt";
 import { prisma } from "../../lib/prisma";
 import { UserRole, UserStatus } from "../../../generated/prisma/enums";
-import { ICreateAdmin, IUpdateProfile } from "./user.interface";
+import { IUpdateProfile } from "./user.interface";
 import status from "http-status";
 import AppError from "../../errorHelpers/AppError";
 
+const changeRole = async (id: string) => {
+  const user = await prisma.user.findUniqueOrThrow({
+    where: {
+      id,
+    },
+  });
 
-const createAdmin = async (payload: ICreateAdmin) => {
-    const {email, password, ...otherData} = payload;
-
-    const isUserExist = await prisma.user.findUnique({
-        where: {
-            email,
-        },
+  if (user.role === UserRole.USER) {
+    const result = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        role: UserRole.ADMIN,
+      },
     });
 
-    if(isUserExist){
-        throw new AppError(status.CONFLICT, "User already exists");
-    }
+    const { password: userPassword, ...safeUser } = result;
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    return safeUser;
+  }
 
-    const result = await prisma.user.create({
-        data: {
-            ...otherData,
-            email,
-            password: hashedPassword,
-            role: UserRole.ADMIN,
-        },
+  if (user.role === UserRole.ADMIN) {
+    const result = await prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        role: UserRole.USER,
+      },
     });
 
-    const {password: userPassword, ...admin} = result;
+    const { password: userPassword, ...safeUser } = result;
 
-    return admin;
-}
+    return safeUser;
+  }
+};
 
 const getAllUsers = async () => {
-    const users = await prisma.user.findMany({
-        where: {
-            status: UserStatus.ACTIVE,
-        }
-    });
+  const users = await prisma.user.findMany({
+    where: {
+      status: UserStatus.ACTIVE,
+    },
+  });
 
-    return users.map(user => {
-        const {password: userPassword, ...safeUser} = user;
-        return safeUser;
-    });
-}
+  return users.map((user) => {
+    const { password: userPassword, ...safeUser } = user;
+    return safeUser;
+  });
+};
 
 const getUserById = async (id: string) => {
-    const user = await prisma.user.findUnique({
-        where: {
-            id,
-        },  
-    });
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+  });
 
-    if(!user){
-        throw new AppError(status.NOT_FOUND, "User not found");
-    }
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
 
-    if (user.status !== UserStatus.ACTIVE) {
-        throw new AppError(status.FORBIDDEN, "User is not active");
-    }
+  if (user.status !== UserStatus.ACTIVE) {
+    throw new AppError(status.FORBIDDEN, "User is not active");
+  }
 
-    const {password: userPassword, ...safeUser} = user;
+  const { password: userPassword, ...safeUser } = user;
 
-    return safeUser;
-}
+  return safeUser;
+};
 
 const updateProfile = async (id: string, payload: IUpdateProfile) => {
-    const user = await prisma.user.update({
-        where: {
-            id,
-        },
-        data: payload,
-    });
+  const user = await prisma.user.update({
+    where: {
+      id,
+    },
+    data: payload,
+  });
 
-    if(!user){
-        throw new AppError(status.NOT_FOUND, "User not found");
-    }
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
 
-    const {password: userPassword, ...safeUser} = user;
+  const { password: userPassword, ...safeUser } = user;
 
-    return safeUser;
-}
+  return safeUser;
+};
 
 const updateStatus = async (id: string) => {
-   const user = await prisma.user.findUnique({
+  const user = await prisma.user.findUnique({
     where: {
-        id,
-    }
-   })
+      id,
+    },
+  });
 
-   if (!user) {
-    throw new AppError(status.NOT_FOUND, "User not found")
-   }
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
 
-   if(user.role === UserRole.ADMIN){
+  if (user.role === UserRole.ADMIN) {
     throw new AppError(status.FORBIDDEN, "Admin cannot be banned");
-   }
+  }
 
-   const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.BANNED : UserStatus.ACTIVE;
+  const newStatus =
+    user.status === UserStatus.ACTIVE ? UserStatus.BANNED : UserStatus.ACTIVE;
 
-   const result = await prisma.user.update({
+  const result = await prisma.user.update({
     where: {
-        id,
+      id,
     },
     data: {
-        status: newStatus,
+      status: newStatus,
     },
-   })
+  });
 
-   const {password: userPassword, ...safeUser} = result;
+  const { password: userPassword, ...safeUser } = result;
 
-   return safeUser;
-}
+  return safeUser;
+};
 
-const getMyProfile = async(id: string)=>{
-    const user = await prisma.user.findUnique({
-        where: {
-            id
-        },
-        include: {
-            eventParticipations:true,
-            events: true
-        }
-    })
+const getMyProfile = async (id: string) => {
+  const user = await prisma.user.findUnique({
+    where: {
+      id,
+    },
+    include: {
+      eventParticipations: true,
+      events: true,
+    },
+  });
 
-    if (!user) {
-        throw new AppError(status.NOT_FOUND, "User not found");
-    }
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
 
-    const {password: userPassword, ...safeUser} = user;
+  const { password: userPassword, ...safeUser } = user;
 
-    return safeUser;
-}
+  return safeUser;
+};
 
 export const UserService = {
-    createAdmin,
-    getAllUsers,
-    getUserById,
-    updateProfile,
-    updateStatus,
-    getMyProfile
-}
+  changeRole,
+  getAllUsers,
+  getUserById,
+  updateProfile,
+  updateStatus,
+  getMyProfile,
+};
